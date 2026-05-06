@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.Net;
 using System.Text;
 using System.Windows.Forms;
 
@@ -11,117 +12,184 @@ namespace CompanyUtilityApp
 {
     public partial class AddEditNodeForm : Form
     {
+        // Add mode fields, resulting node data, Existing node, Description update for Areas
+        private List<Area> _availableAreas;
+        private bool _isAddMode;
         public Node NodeData { get; private set; }
+        private Node _existingNode;
+        private Area _existingArea;
+        public string AreaDescription { get; private set; }
 
-        public AddEditNodeForm(int selectedRoute)
+        public AddEditNodeForm(int route)
         {
             InitializeComponent();
-            txtRoute.Text = selectedRoute.ToString();
-            PopulatePanelLocationComboBox();
-            NodeData = new Node { Route = selectedRoute };
-            this.Text = "Add New Node";
+            chkCalibration.Checked = false;
+            _isAddMode = true;
+            txtRoute.Text = route.ToString();
+            LoadAvailableAreas(route);
+            WireUpLinkedDropdowns();
         }
 
-        public AddEditNodeForm(Node existingNode)
+        // Constructor for EDIT
+        public AddEditNodeForm(Node node, Area area)
         {
+            if (node == null) throw new ArgumentNullException(nameof(node));
+            if (area == null) throw new ArgumentNullException(nameof(area));
+
             InitializeComponent();
-            PopulatePanelLocationComboBox();
-            txtRoute.Text = existingNode.Route.ToString();
-            txtIPAddress.Text = existingNode.IPAddress;
-            cmbPanelLocation.SelectedItem = existingNode.PanelLocation;
-            txtDescription.Text = existingNode.Description;
-            NodeData = existingNode;
-            this.Text = "Edit Node";
-        }
+            _isAddMode = false;
+            _existingNode = node;
+            _existingArea = area;
 
-        private void PopulatePanelLocationComboBox()
-        {
-            for (int i = 1; i <= 100; i++)
-                cmbPanelLocation.Items.Add(i);
+            // Route (read‑only)
+            txtRoute.Text = area.Route.ToString();
+
+            // Panel Location combo – load only the stored value and disable
+            cmbPanelLocation.Items.Clear();
+            cmbPanelLocation.Items.Add(area.PanelLocation);
             cmbPanelLocation.SelectedIndex = 0;
+            cmbPanelLocation.Enabled = false;
+
+            // Panel Serial Number combo – load only the stored value and disable
+            cmbPanelSerialNumber.Items.Clear();
+            cmbPanelSerialNumber.Items.Add(area.PanelSerialNumber);
+            cmbPanelSerialNumber.SelectedIndex = 0;
+            cmbPanelSerialNumber.Enabled = false;
+
+            // Holding Register (read‑only)
+            txtHR.Text = area.HoldingRegister.ToString();
+            txtHR.Enabled = false;
+
+            // Description (editable) – load from Areas
+            txtDescription.Text = area.Description ?? "";
+
+            // Node Number (editable)
+            txtNodeNumber.Text = node.NodeNumber.ToString();
+
+            // Local IP Address (editable)
+            txtIPAddress.Text = node.LocalIPAddress;
+
+            // Calibration checkbox (editable)
+            chkCalibration.Checked = node.Calibration;
         }
 
-        private bool IsValidIpAddress(string ipString)
+        private void LoadAvailableAreas(int route)
         {
-            if (string.IsNullOrWhiteSpace(ipString))
-                return false;
+            _availableAreas = NodeRepository.GetAvailableAreasForRoute(route);
+            cmbPanelLocation.DataSource = null;
+            cmbPanelLocation.DataSource = _availableAreas;
+            cmbPanelLocation.DisplayMember = "PanelLocation";
+            cmbPanelLocation.SelectedIndex = -1;
 
-            // Use .NET's built-in IP address parser
-            if (System.Net.IPAddress.TryParse(ipString, out System.Net.IPAddress address))
+            cmbPanelSerialNumber.DataSource = null;
+            cmbPanelSerialNumber.DataSource = _availableAreas;
+            cmbPanelSerialNumber.DisplayMember = "PanelSerialNumber";
+            cmbPanelSerialNumber.SelectedIndex = -1;
+        }
+
+        private void WireUpLinkedDropdowns()
+        {
+            cmbPanelLocation.SelectedIndexChanged += (s, e) =>
             {
-                // Ensure it's IPv4 (not IPv6) and has exactly 4 parts
-                return address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork;
-            }
-            return false;
+                if (cmbPanelLocation.SelectedItem is Area selected)
+                {
+                    cmbPanelSerialNumber.SelectedItem = selected;
+                    txtHR.Text = selected.HoldingRegister.ToString();
+                }
+            };
+
+            cmbPanelSerialNumber.SelectedIndexChanged += (s, e) =>
+            {
+                if (cmbPanelSerialNumber.SelectedItem is Area selected)
+                {
+                    cmbPanelLocation.SelectedItem = selected;
+                    txtHR.Text = selected.HoldingRegister.ToString();
+                }
+            };
         }
 
         private void btnSave_Click(object sender, EventArgs e)
         {
-            // 1. Required IP address
-            if (string.IsNullOrWhiteSpace(txtIPAddress.Text))
-            {
-                MessageBox.Show("IP Address is required.");
-                txtIPAddress.Focus();
-                return;  // <-- STOP HERE
-            }
 
-            // 2. Format validation
-            if (!IsValidIpAddress(txtIPAddress.Text.Trim()))
+            // Validate IP
+            string ip = txtIPAddress.Text.Trim();
+            if (string.IsNullOrEmpty(ip) || !IPAddress.TryParse(ip, out _))
             {
-                MessageBox.Show("Please enter a valid IPv4 address...");
+                MessageBox.Show("Enter a valid IPv4 address.");
                 txtIPAddress.Focus();
                 return;
             }
 
-            // 3. Panel location validation (typed or selected)
-            int panelLocation;
-            if (cmbPanelLocation.SelectedItem != null)
-                panelLocation = (int)cmbPanelLocation.SelectedItem;
-            else if (!int.TryParse(cmbPanelLocation.Text.Trim(), out panelLocation) || panelLocation < 1 || panelLocation > 100)
+            // Validate NodeNumber
+            if (!int.TryParse(txtNodeNumber.Text.Trim(), out int nodeNum) || nodeNum <= 0)
             {
-                MessageBox.Show("Panel Location must be between 1 and 100.");
-                cmbPanelLocation.Focus();
+                MessageBox.Show("Node Number must be a positive integer.");
+                txtNodeNumber.Focus();
                 return;
             }
 
-            // 4. Route
-            if (!int.TryParse(txtRoute.Text, out int route))
+            if (_isAddMode)
             {
-                MessageBox.Show("Route is invalid.");
-                return;
+                // Check unique constraints
+                int? excludeId = null; // new node
+                if (NodeRepository.NodeNumberExists(nodeNum, excludeId))
+                {
+                    MessageBox.Show("This Node Number is already in use.");
+                    txtNodeNumber.Focus();
+                    return;
+                }
+                if (NodeRepository.LocalIPExists(ip, excludeId))
+                {
+                    MessageBox.Show("This IP address is already assigned.");
+                    txtIPAddress.Focus();
+                    return;
+                }
+
+                // Build NodeData
+                var selectedArea = (Area)cmbPanelLocation.SelectedItem;
+                NodeData = new Node
+                {
+                    NodeNumber = nodeNum,
+                    PanelSerialNumber = selectedArea.PanelSerialNumber,
+                    LocalIPAddress = ip
+                };
+                NodeData.Calibration = chkCalibration.Checked;
+
+                // Description to be saved to Areas
+                AreaDescription = string.IsNullOrEmpty(txtDescription.Text.Trim()) ? null : txtDescription.Text.Trim();
+                DialogResult = DialogResult.OK;
+                Close();
             }
-
-            // Build NodeData
-            NodeData.Route = route;
-            NodeData.IPAddress = txtIPAddress.Text.Trim();
-            NodeData.PanelLocation = panelLocation;
-            NodeData.Description = txtDescription.Text.Trim();
-
-            // 5. Duplicate IP check
-            int? excludeId = (NodeData.Id > 0) ? NodeData.Id : (int?)null;
-            if (NodeRepository.IpAddressExists(NodeData.IPAddress, excludeId))
+            else // Edit mode
             {
-                MessageBox.Show($"The IP Address '{NodeData.IPAddress}' is already assigned...");
-                txtIPAddress.Focus();
-                return;
+                // Check uniqueness excluding current node
+                int? excludeId = _existingNode.Id;
+                if (NodeRepository.NodeNumberExists(nodeNum, excludeId))
+                {
+                    MessageBox.Show("This Node Number is already in use.");
+                    txtNodeNumber.Focus();
+                    return;
+                }
+                if (NodeRepository.LocalIPExists(ip, excludeId))
+                {
+                    MessageBox.Show("This IP address is already assigned.");
+                    txtIPAddress.Focus();
+                    return;
+                }
+
+                // Update existing node
+                _existingNode.NodeNumber = nodeNum;
+                _existingNode.LocalIPAddress = ip;
+                _existingNode.Calibration = chkCalibration.Checked;
+                NodeRepository.UpdateNode(_existingNode);
+
+                // Save description to Areas
+                AreaDescription = string.IsNullOrEmpty(txtDescription.Text.Trim()) ? null : txtDescription.Text.Trim();
+                AreaRepository.UpdateArea(_existingArea.Id, _existingArea.PanelSerialNumber, AreaDescription);
+
+                DialogResult = DialogResult.OK;
+                Close();
             }
-
-            // 6. Duplicate Panel per Route check
-            if (NodeRepository.PanelLocationExistsForRoute(NodeData.Route, NodeData.PanelLocation, excludeId))
-            {
-                MessageBox.Show($"Panel Location '{NodeData.PanelLocation}' is already used on Route {NodeData.Route}.");
-                cmbPanelLocation.Focus();
-                return;
-            }
-
-            // If we reach here, everything is valid.
-            this.DialogResult = DialogResult.OK;
-            this.Close();
-        }
-
-        private void txtRoute_TextChanged(object sender, EventArgs e)
-        {
-
         }
     }
 }

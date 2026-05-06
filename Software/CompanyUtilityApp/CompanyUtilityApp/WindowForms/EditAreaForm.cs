@@ -1,32 +1,42 @@
-﻿using System;
+﻿using CompanyUtilityApp.ProgramFiles;
+using System;
 using System.Windows.Forms;
 
 namespace CompanyUtilityApp
 {
     public partial class EditAreaForm : Form
     {
+        public int PanelSerialNumber { get; private set; }
         public string Description { get; private set; }
 
-        public EditAreaForm(int route, int panelLocation, string currentDescription)
+        // Constructor receives the selected Area object to pre‑fill fields
+        public EditAreaForm(Area area)
         {
             InitializeComponent();
-            txtPanelLocation.Text = panelLocation.ToString();
-            txtDescription.Text = currentDescription ?? string.Empty;
-            this.Text = $"Edit Panel Description – Route {route}, Panel {panelLocation}";
+            txtRoute.Text = area.Route.ToString();
+            txtPanelLocation.Text = area.PanelLocation.ToString();
+            txtHoldingRegister.Text = area.HoldingRegister.ToString();
+            txtPanelSerialNumber.Text = area.PanelSerialNumber.ToString();
+            txtDescription.Text = area.Description ?? "";
         }
 
         private void btnSave_Click(object sender, EventArgs e)
         {
-            string desc = txtDescription.Text.Trim();
-            // Convert empty string to null so DB stores NULL
-            Description = string.IsNullOrEmpty(desc) ? null : desc;
-            this.DialogResult = DialogResult.OK;
-            this.Close();
-        }
+            // Validate PanelSerialNumber
+            if (!int.TryParse(txtPanelSerialNumber.Text.Trim(), out int serial) || serial <= 0)
+            {
+                MessageBox.Show("Panel Serial Number must be a positive integer.", "Validation Error",
+                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtPanelSerialNumber.Focus();
+                return;
+            }
 
-        private void button2_Click(object sender, EventArgs e)
-        {
-            this.Close();
+            PanelSerialNumber = serial;
+            string desc = txtDescription.Text.Trim();
+            Description = string.IsNullOrEmpty(desc) ? null : desc;
+
+            DialogResult = DialogResult.OK;
+            Close();
         }
     }
 }

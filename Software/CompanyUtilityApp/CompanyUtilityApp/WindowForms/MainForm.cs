@@ -47,7 +47,7 @@ namespace CompanyUtilityApp
             TSB.Visible = loggedIn;
             loginToolStripMenuItem.Text = loggedIn ? "Logout" : "Login";
 
-            // Enable/disable protected features
+            //// Enable/disable protected features
             //Node.Enabled = loggedIn;
             //Area.Enabled = loggedIn;
             //Tests.Enabled = loggedIn;
@@ -263,8 +263,11 @@ namespace CompanyUtilityApp
 
         private void PanelSettings_Click(object sender, EventArgs e)
         {
-            //LoadUserControl(new PanelSettingsControl());
-            LoadUserControl(new PanelSettingsControl());
+
+            var panelSettings = new PanelSettingsControl();
+            panelSettings.IsAdmin = (_currentUser != null &&
+                                     _currentUser.Username.Equals("admin", StringComparison.OrdinalIgnoreCase));
+            LoadUserControl(panelSettings);
 
         }
     }

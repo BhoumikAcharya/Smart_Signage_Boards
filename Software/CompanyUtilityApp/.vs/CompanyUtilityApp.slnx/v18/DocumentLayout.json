@@ -11,8 +11,28 @@
       "RelativeMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|solutionrelative:companyutilityapp\\windowforms\\addeditnodeform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|e:\\projects\\sinage project\\companyutilityapp\\companyutilityapp\\windowforms\\editareaform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
-      "RelativeMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|solutionrelative:companyutilityapp\\windowforms\\editareaform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+      "AbsoluteMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|e:\\projects\\sinage project\\companyutilityapp\\companyutilityapp\\usercontrols\\nodecontrol.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|solutionrelative:companyutilityapp\\usercontrols\\nodecontrol.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|e:\\projects\\sinage project\\companyutilityapp\\companyutilityapp\\usercontrols\\nodecontrol.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|solutionrelative:companyutilityapp\\usercontrols\\nodecontrol.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|e:\\projects\\sinage project\\companyutilityapp\\companyutilityapp\\usercontrols\\panelsettingscontrol.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|solutionrelative:companyutilityapp\\usercontrols\\panelsettingscontrol.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|e:\\projects\\sinage project\\companyutilityapp\\companyutilityapp\\programfiles\\noderepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|solutionrelative:companyutilityapp\\programfiles\\noderepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|e:\\projects\\sinage project\\companyutilityapp\\companyutilityapp\\programfiles\\arearepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|solutionrelative:companyutilityapp\\programfiles\\arearepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|e:\\projects\\sinage project\\companyutilityapp\\companyutilityapp\\windowforms\\addeditnodeform.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4FA51CCC-DBE2-841F-E00F-A51DD5DAC495}|CompanyUtilityApp\\CompanyUtilityApp.csproj|solutionrelative:companyutilityapp\\windowforms\\addeditnodeform.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -22,11 +42,49 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 4,
           "Children": [
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "PanelSettingsControl.cs [Design]",
+              "DocumentMoniker": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\UserControls\\PanelSettingsControl.cs",
+              "RelativeDocumentMoniker": "CompanyUtilityApp\\UserControls\\PanelSettingsControl.cs",
+              "ToolTip": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\UserControls\\PanelSettingsControl.cs [Design]",
+              "RelativeToolTip": "CompanyUtilityApp\\UserControls\\PanelSettingsControl.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-06T08:45:23.015Z",
+              "EditorCaption": " [Design]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "AreaRepository.cs",
+              "DocumentMoniker": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\ProgramFiles\\AreaRepository.cs",
+              "RelativeDocumentMoniker": "CompanyUtilityApp\\ProgramFiles\\AreaRepository.cs",
+              "ToolTip": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\ProgramFiles\\AreaRepository.cs",
+              "RelativeToolTip": "CompanyUtilityApp\\ProgramFiles\\AreaRepository.cs",
+              "ViewState": "AgIAADgAAAAAAAAAAAAIwDMAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-06T06:18:43.167Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "NodeControl.cs",
+              "DocumentMoniker": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\UserControls\\NodeControl.cs",
+              "RelativeDocumentMoniker": "CompanyUtilityApp\\UserControls\\NodeControl.cs",
+              "ToolTip": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\UserControls\\NodeControl.cs",
+              "RelativeToolTip": "CompanyUtilityApp\\UserControls\\NodeControl.cs",
+              "ViewState": "AgIAAB8AAAAAAAAAAAAIwDkAAAA9AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-06T06:16:19.522Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -36,22 +94,10 @@
               "RelativeDocumentMoniker": "CompanyUtilityApp\\WindowForms\\AddEditNodeForm.cs",
               "ToolTip": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\WindowForms\\AddEditNodeForm.cs",
               "RelativeToolTip": "CompanyUtilityApp\\WindowForms\\AddEditNodeForm.cs",
-              "ViewState": "AgIAADAAAAAAAAAAAAAmwD8AAAAlAAAAAAAAAA==",
+              "ViewState": "AgIAADMAAAAAAAAAAADwvyAAAAAfAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-28T10:59:14.539Z",
+              "WhenOpened": "2026-05-06T06:09:06.04Z",
               "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "EditAreaForm.cs [Design]",
-              "DocumentMoniker": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\WindowForms\\EditAreaForm.cs",
-              "RelativeDocumentMoniker": "CompanyUtilityApp\\WindowForms\\EditAreaForm.cs",
-              "ToolTip": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\WindowForms\\EditAreaForm.cs [Design]",
-              "RelativeToolTip": "CompanyUtilityApp\\WindowForms\\EditAreaForm.cs [Design]",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-28T10:59:05.883Z",
-              "EditorCaption": " [Design]"
             },
             {
               "$type": "Document",
@@ -62,8 +108,46 @@
               "ToolTip": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\WindowForms\\AddEditNodeForm.cs [Design]",
               "RelativeToolTip": "CompanyUtilityApp\\WindowForms\\AddEditNodeForm.cs [Design]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-28T10:59:04.642Z",
+              "WhenOpened": "2026-05-06T05:54:49.315Z",
               "EditorCaption": " [Design]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "AddEditNodeForm.Designer.cs",
+              "DocumentMoniker": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\WindowForms\\AddEditNodeForm.Designer.cs",
+              "RelativeDocumentMoniker": "CompanyUtilityApp\\WindowForms\\AddEditNodeForm.Designer.cs",
+              "ToolTip": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\WindowForms\\AddEditNodeForm.Designer.cs",
+              "RelativeToolTip": "CompanyUtilityApp\\WindowForms\\AddEditNodeForm.Designer.cs",
+              "ViewState": "AgIAABwAAAAAAAAAAAAQwBwAAAAoAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-06T07:30:58.598Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "NodeControl.cs [Design]",
+              "DocumentMoniker": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\UserControls\\NodeControl.cs",
+              "RelativeDocumentMoniker": "CompanyUtilityApp\\UserControls\\NodeControl.cs",
+              "ToolTip": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\UserControls\\NodeControl.cs [Design]",
+              "RelativeToolTip": "CompanyUtilityApp\\UserControls\\NodeControl.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-06T08:54:31.868Z",
+              "EditorCaption": " [Design]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "NodeRepository.cs",
+              "DocumentMoniker": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\ProgramFiles\\NodeRepository.cs",
+              "RelativeDocumentMoniker": "CompanyUtilityApp\\ProgramFiles\\NodeRepository.cs",
+              "ToolTip": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\ProgramFiles\\NodeRepository.cs",
+              "RelativeToolTip": "CompanyUtilityApp\\ProgramFiles\\NodeRepository.cs",
+              "ViewState": "AgIAAAgBAAAAAAAAAADgvxYBAAAcAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-06T05:47:22.625Z",
+              "EditorCaption": ""
             }
           ]
         }

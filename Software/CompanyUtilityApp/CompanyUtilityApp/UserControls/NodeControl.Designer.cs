@@ -52,6 +52,7 @@
             // 
             // cmbRoute
             // 
+            cmbRoute.DropDownStyle = ComboBoxStyle.DropDownList;
             cmbRoute.FormattingEnabled = true;
             cmbRoute.Location = new Point(170, 38);
             cmbRoute.Name = "cmbRoute";
@@ -101,7 +102,6 @@
             dgvNodes.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgvNodes.Size = new Size(508, 261);
             dgvNodes.TabIndex = 5;
-            dgvNodes.CellContentClick += dgvNodes_CellContentClick;
             // 
             // panel1
             // 
