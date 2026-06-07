@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "buck converter module")(type "KiCad")(uri "${KIPRJMOD}/buck converter module.kicad_sym")(options "")(descr ""))
+)
