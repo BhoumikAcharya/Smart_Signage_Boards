@@ -13370,7 +13370,7 @@
 	)
 	(wire
 		(pts
-			(xy 341.63 234.95) (xy 341.63 240.03)
+			(xy 341.63 236.22) (xy 341.63 240.03)
 		)
 		(stroke
 			(width 0)
@@ -18310,7 +18310,7 @@
 	)
 	(wire
 		(pts
-			(xy 337.82 234.95) (xy 341.63 234.95)
+			(xy 337.82 236.22) (xy 341.63 236.22)
 		)
 		(stroke
 			(width 0)
@@ -19638,7 +19638,7 @@
 		)
 	)
 	(global_label "COM1"
-		(shape output)
+		(shape input)
 		(at 571.5 274.32 0)
 		(effects
 			(font
@@ -19915,6 +19915,30 @@
 			)
 		)
 	)
+	(global_label "COM1"
+		(shape output)
+		(at 337.82 236.22 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "6a7bd7b7-b34a-454a-966f-bb7eb1f9e4f5")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 329.5734 236.22 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
 	(global_label "NC3"
 		(shape output)
 		(at 579.12 387.35 0)
@@ -19960,7 +19984,7 @@
 		)
 	)
 	(global_label "COM3"
-		(shape output)
+		(shape input)
 		(at 579.12 419.1 0)
 		(effects
 			(font
@@ -19978,6 +20002,30 @@
 				(font
 					(size 1.27 1.27)
 				)
+			)
+		)
+	)
+	(global_label "BC2_12_O{slash}P_1"
+		(shape input)
+		(at 337.82 232.41 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "8e02e1aa-cc90-4155-b732-871492da31c2")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 320.623 232.41 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
 			)
 		)
 	)
@@ -20378,7 +20426,7 @@
 		)
 	)
 	(global_label "COM2"
-		(shape output)
+		(shape input)
 		(at 575.31 347.98 0)
 		(effects
 			(font
