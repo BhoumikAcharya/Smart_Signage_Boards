@@ -214,7 +214,7 @@
             // 
             saveToolStripMenuItem.Name = "saveToolStripMenuItem";
             saveToolStripMenuItem.Size = new Size(149, 26);
-            saveToolStripMenuItem.Text = "Save";
+            saveToolStripMenuItem.Text = "Save File";
             saveToolStripMenuItem.Click += saveToolStripMenuItem_Click;
             // 
             // printToolStripMenuItem

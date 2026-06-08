@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CompanyUtilityApp.ProgramFiles;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -21,19 +22,27 @@ namespace CompanyUtilityApp
         private void LoadAreas()
         {
             int route = (int)cmbRoute.SelectedItem;
+            dgvAreas.DataSource = null;
             dgvAreas.DataSource = AreaRepository.GetAreasByRoute(route);
+            ConfigureGridColumns();
+        }
 
-            // Configure columns
-            if (dgvAreas.Columns.Count > 0)
-            {
-                dgvAreas.Columns["Route"].Visible = false;               // hide route (already selected)
-                dgvAreas.Columns["PanelLocation"].HeaderText = "Panel Location";
-                dgvAreas.Columns["IPAddress"].HeaderText = "IP Address";
-                dgvAreas.Columns["Description"].HeaderText = "Panel Area Location Description";
+        private void ConfigureGridColumns()
+        {
+            if (dgvAreas.Columns.Count == 0) return;
 
-                // Make the description column wider (e.g., 300 pixels)
-                dgvAreas.Columns["Description"].Width = 300;
-            }
+            // Hide the internal Id column
+            dgvAreas.Columns["Id"].Visible = false;
+
+            // Set column headers
+            dgvAreas.Columns["Route"].HeaderText = "Route";
+            dgvAreas.Columns["PanelLocation"].HeaderText = "Panel Location";
+            dgvAreas.Columns["HoldingRegister"].HeaderText = "Holding Register";
+            dgvAreas.Columns["PanelSerialNumber"].HeaderText = "Panel Serial Number";
+            dgvAreas.Columns["Description"].HeaderText = "Panel Location Description";
+
+            // Optional widths
+            dgvAreas.Columns["Description"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
         }
 
         private void cmbRoute_SelectedIndexChanged(object sender, EventArgs e)
@@ -41,40 +50,27 @@ namespace CompanyUtilityApp
             LoadAreas();
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        private void btnEdit_Click(object sender, EventArgs e)
         {
             if (dgvAreas.SelectedRows.Count == 0) return;
-
-            AreaDisplayItem selected = dgvAreas.SelectedRows[0].DataBoundItem as AreaDisplayItem;
+            Area selected = (Area)dgvAreas.SelectedRows[0].DataBoundItem;
             if (selected == null) return;
 
-            using (var dialog = new EditAreaForm(selected.Route, selected.PanelLocation, selected.Description))
+            using (var dialog = new EditAreaForm(selected))
             {
                 if (dialog.ShowDialog() == DialogResult.OK)
                 {
-                    AreaRepository.UpdateDescription(selected.Route, selected.PanelLocation, dialog.Description);
-                    LoadAreas(); // refresh grid to show updated description
+                    // Update the database
+                    bool success = AreaRepository.UpdateArea(selected.Id, dialog.PanelSerialNumber, dialog.Description);
+                    if (!success)
+                    {
+                        MessageBox.Show("The entered Panel Serial Number is already in use.", "Duplicate Serial",
+                                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    LoadAreas(); // Refresh grid
                 }
             }
         }
-
-        //private void cmbRoute_KeyDown(object sender, KeyEventArgs e)
-        //{
-        //    if (e.KeyCode == Keys.Enter)
-        //    {
-        //        e.SuppressKeyPress = true; // prevent ding sound
-        //        string typedText = cmbRoute.Text.Trim();
-        //        if (int.TryParse(typedText, out int route) && route >= 1 && route <= 4)
-        //        {
-        //            cmbRoute.SelectedItem = route; // This will trigger SelectedIndexChanged
-        //        }
-        //        else
-        //        {
-        //            MessageBox.Show("Please enter a valid route (1‑4).", "Invalid Route", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        //            cmbRoute.Focus();
-        //            cmbRoute.SelectAll();
-        //        }
-        //    }
-        //}
     }
 }

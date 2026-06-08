@@ -47,7 +47,7 @@
             btnEdit.TabIndex = 0;
             btnEdit.Text = "EDIT";
             btnEdit.UseVisualStyleBackColor = true;
-            btnEdit.Click += button1_Click;
+            btnEdit.Click += btnEdit_Click;
             // 
             // dgvAreas
             // 
