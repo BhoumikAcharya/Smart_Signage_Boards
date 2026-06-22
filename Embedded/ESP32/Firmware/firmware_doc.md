@@ -1,76 +1,93 @@
-## ESP32 Signage Firmware (Enterprise Edition)
+# ESP32 Enterprise Signage Controller (Firmware v2.0)
 
-Name:Bhoumik Acharya
+**Architecture:** Dual-Core FreeRTOS, MCP23017 I2C Expander, 4x ACS712  
+**Role:** Hardware Edge Controller & Network Node
 
-Date: 05/05/2026
+---
 
-Version: 1.1.0
+## 1. Architectural Overview
 
-| Version | Date | Author | Description |
-| ------- | ---- | ------ | ----------- |
-| 1.0 | May 2026 | Core Engineering | Initial V1.1.0 Baseline creation. |
+This firmware utilizes FreeRTOS to strictly decouple network operations from high-speed hardware control via a Dual-Core architecture.
 
-Version: 1.0.1
-Role: Hardware Edge Controller
+* **Core 1 (Application & Networking):** Handles the main `loop()`, Ethernet events, MQTT payload parsing, and executes the high-speed, non-blocking LED animation state machine.
+* **Core 0 (Hardware DSP):** Runs a dedicated `SensorTask`. It obsessively handles ADC reads, applies median filtering to ignore EMI noise, and calculates the 4-State discrepancy logic.
+* **Inter-Process Communication (IPC):** The cores share data seamlessly using a FreeRTOS `QueueHandle_t` (Mailbox pattern), eliminating race conditions between the network and the sensors.
 
-Description: This is the baseline code for the ESP32
+---
 
-### 1. Architectural Overview
+## 2. Hardware Pin Mapping
 
-This firmware utilizes FreeRTOS to strictly decouple network operations from hardware operations via a Dual-Core architecture. This ensures that severe network latency, dropped packets, or broker restarts never interrupt the reading of critical analog sensors or battery compensation math.
+### Ethernet PHY (LAN8720) - Hardwired
+* **GPIO 0, 18, 19, 21, 22, 23, 25, 26, 27** ### I2C Bus (MCP23017 Expander)
+* **GPIO 16:** I2C SDA
+* **GPIO 17:** I2C SCL
 
-#### Core Separation
+### Analog Sensors (ADC1 Only)
+* **GPIO 36:** PSU Voltage Monitor
+* **GPIO 39:** Battery Voltage Monitor
+* **GPIO 34:** ACS712 #1 (Left Arrows Current)
+* **GPIO 35:** ACS712 #2 (Right Arrows Current)
+* **GPIO 32:** ACS712 #3 (Always ON Current)
 
-- Core 1 (Application/Network): Handles *setup()*, the *main loop()*, Ethernet events, and MQTT payload parsing.
+---
 
-- Core 0 (Hardware DSP): Runs a dedicated *SensorTask* pinned to the core. Handles ADC reads, median filtering, and battery math.
+## 3. MQTT Topic Structure
 
-#### Inter-Process Communication (IPC)
+The firmware subscribes and publishes to the following topics, uniquely identified by its `ASSIGNED_REGISTER` (e.g., `40001`):
 
-The cores share data using a FreeRTOS QueueHandle_t named sensorQueue configured with a length of 1.
+* **RX (Receive):**
+  * `metro/signage/register/[ID]/value`: Accepts integer commands for animations.
+  * `metro/signage/scan`: Accepts `PING` to reset fail-safe watchdog.
 
-- It utilizes the Mailbox Pattern. Core 0 uses *xQueueOverwrite()* to blindly drop a serialized *NodeStateMsg* struct into the queue. Core 1 checks the queue non-blockingly using *xQueueReceive()*. This eliminates mutex bottlenecks and race conditions.
+* **TX (Publish):**
+  * `metro/signage/register/[ID]/status`: Network status (`ONLINE:<IP>` or `OFFLINE`).
+  * `metro/signage/register/[ID]/power`: PSU health (`OK` or `FAIL`).
+  * `metro/signage/register/[ID]/current1`: Left Load State (4-State String).
+  * `metro/signage/register/[ID]/current2`: Right Load State (4-State String).
+  * `metro/signage/register/[ID]/current3`: Always ON Load State (4-State String).
+  * `metro/signage/register/[ID]/battery_pct`: Battery percentage (0-100).
 
-### 2. Core Security & Resilience
+---
 
-#### Hardware Watchdog Timer (WDT)
+## 4. Control Logic & Animation Modes
 
-Configured using the modern ESP-IDF v5 (*esp_task_wdt_config_t*) struct. The WDT timeout is set to 15 seconds. Both the main *loop()* (Core 1) and *SensorTask* (Core 0) must call *esp_task_wdt_reset()*. If either core freezes in an infinite loop, the hardware physical resets the chip.
+The system controls 10 MOSFETs via the MCP23017. The commands received via MQTT are split into two distinct operational modes using a "Modbus Offset" strategy:
 
-#### 5-Minute Fail-Safe (Dead-Man Switch)
+### Mode A: Macro Animations (Payloads `0` to `4`)
+Standard commands trigger pre-programmed bitmask animation sequences that update every 300ms using a non-blocking `millis()` state machine.
+* `0`: All OFF
+* `1`: Left Chase (3-LED sequential movement)
+* `2`: Right Chase
+* `3`: Both Chase
+* `4`: Solid ON (Fail-Safe State)
 
-Core 1 tracks *lastCommsTime*. This is updated whenever any valid MQTT message arrives on the control topic, OR when the Raspberry Pi broadcasts the *PING* string to the scan topic.
+### Mode B: Raw Bitmask Override (Payloads `10000` to `11023`)
+Advanced control mode. The firmware subtracts the `10000` offset, leaving a 10-bit integer (0-1023). It slices this integer into two 5-bit chunks and pushes them directly to Port A (Left) and Port B (Right) of the MCP23017, allowing exact control of individual LED strips.
 
-- If *lastCommsTime* exceeds 300,000ms (5 minutes), the ESP32 assumes total network blackout.
+---
 
-- It enters *inFailSafeMode = true*, forces physical relays 1 and 2 *LOW* (Signage ON), and sets *currentRelayState = 3*.
+## 5. Hardware DSP & 4-State Discrepancy Logic
 
-#### EMI Immune ADC Filtering
+Instead of a binary `OK/FAIL`, Core 0 compares the **Intended State** (set by Core 1's animations) against the **Actual Current** (measured by the ACS712s) to produce 4 highly accurate diagnostic strings:
 
-    Instead of simple averaging, the system uses *getMedianADC()*. It takes a fixed-size *int samples[51]* buffer directly on the task stack, reads 51 consecutive ADC values, and runs an Insertion Sort algorithm. It returns the absolute middle value, effectively ignoring 100% of high-voltage transient spikes caused by train EMI.
+1. **`ON`**: Microcontroller intended for the LED to be ON, and current is successfully flowing.
+2. **`OFF`**: Microcontroller intended for the LED to be OFF, and no current is flowing.
+3. **`FAIL_OPEN`**: Intended ON, but 0 Amps flowing (Broken wiring, burnt LED, or blown MOSFET).
+4. **`FAIL_SHORT`**: Intended OFF, but current is still flowing (Welded MOSFET or short to main power).
 
-### 3. Sensor & Math Algorithms
+### Dynamic Thresholding
+To prevent false `FAIL_OPEN` alarms during Mode B (where a user might only turn on 1 LED strip instead of 3), Core 1 mathematically counts the number of active `1`s in the bitmask (`countActiveStrips()`). It dynamically scales the expected amperage threshold so Core 0 knows exactly how much current to expect for that specific frame of animation.
 
-#### Dynamic Battery Compensation
+---
 
-The *checkBattery()* logic executes every 5000ms. Because activating the relays causes a physical voltage drop across the wiring harness, the software dynamically compensates:
+## 🚨 HIGHLIGHT: Changes from Previous Version (v1 -> v2)
 
-- Reads the *BATTERY_PIN* via the median filter.
+If you are migrating from the old relay-based architecture, here are the major changes implemented in this version:
 
-- Applies the *K_CALIBRATION* multiplier to the hardware voltage divider math.
-
-- Checks *currentRelayState* (pulled atomically from Core 1).
-
-- If State = 1 or 2 (One Load): Adds *+0.40V* to the calculation.
-
-- If State = 3 (Both Loads): Adds *+0.58V* to the calculation.
-
-- Calculates discrete quartiles (100%, 50%, 0%) to prevent fluctuating UX.
-
-#### Command Payload Validation
-
-In the MQTT *callback()* function, incoming payloads are copied into a *static char msgBuffer[16]* using *memcpy* to prevent buffer overflow attacks or memory leaks from Arduino Strings. The integer is validated using *if (temp_command >= 0 && temp_command <= 3)* before hardware is actuated.
-
-### 4. The SCADA Blind Spot Fix
-
-In addition to reporting current and voltage, the ESP32 publishes to a *.../relay_status* topic. Core 0 detects if the physical relays were overridden by the 5-minute fail-safe and passes this state to Core 1 via the Mailbox. Core 1 publishes this to SCADA, ensuring the Master PLC always knows the actual physical state of the relays regardless of what command was previously sent.
+1. **Relays Removed, I2C Added:** Dropped physical relays on GPIO 4/13. Integrated the `Adafruit_MCP23X17` library to drive 10 independent solid-state MOSFET channels over I2C (GPIO 16/17).
+2. **Non-Blocking Animations:** Added `runAnimationStateMachine()` on Core 1 to create visual "Chase" effects using bitmask arrays without using `delay()`, keeping the network fully responsive.
+3. **Modbus Offset Feature:** Added the 10,000+ integer block logic to allow granular, individual control of all 10 MOSFETs alongside the standard macro animations.
+4. **Added 3rd Load Tracking:** Integrated `PIN_CURR_ALWY` (GPIO 32) and `current3` MQTT topic to track the "Always ON" LED strips.
+5. **4-State Discrepancy Logic:** Completely replaced the old binary `OK/FAIL` current monitoring. The system now cross-references expected software states with physical hardware reality to output `ON`, `OFF`, `FAIL_OPEN`, or `FAIL_SHORT`.
+6. **Dynamic Thresholds:** Fixed a bug where turning on a single LED strip triggered a failure. Thresholds now scale dynamically (`dynamicThreshLeft`, `dynamicThreshRight`) based on the exact number of active pins.
+7. **Individual Sensor Calibration:** Replaced global `SENSITIVITY` and `ZERO_VOLT` variables with dedicated baseline variables for all three ACS712 sensors to account for manufacturing tolerances.

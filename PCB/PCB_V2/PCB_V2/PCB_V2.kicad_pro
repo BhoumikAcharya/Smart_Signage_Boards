@@ -739,7 +739,7 @@
         "uuid": "a998f26b-7f4a-422c-bbac-a5cbd2476f0d"
       }
     ],
-    "used_designators": "",
+    "used_designators": "R2-3,R10-16,R18-21,R62-72,#FLG10,#FLG12,#FLG101-103,L1,L3,D2,D19-21,ACT1,T1,#PWR5,#PWR7-9,#PWR12-17,#PWR20,#PWR25,#PWR27-28,#PWR30-31,#PWR53-58,#PWR61,#PWR65-66,#PWR73,#PWR101-107,#PWR109,BUT1,C2,C7-11,C13-14,C23-24,C43-47,FET3,LNK1,Q2,Q6,RM1-2,RST1,TVS1-3,U1,U11-13,USB\\-UART1",
     "variants": []
   },
   "sheets": [

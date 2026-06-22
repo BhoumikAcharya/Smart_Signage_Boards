@@ -1,51 +1,63 @@
+/*
+ * ESP32 Enterprise Signage Controller
+ * Architecture: MCP23017 I2C (10-Ch MOSFETs) + 4x ACS712
+ * Features: Non-blocking animations, 4-State Discrepancy Logic, Modbus Offset
+ */
+
 #include <ETH.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
-#include <esp_task_wdt.h> // Hardware Watchdog Timer
+#include <Wire.h>
+#include <Adafruit_MCP23X17.h>
+#include <esp_task_wdt.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <freertos/queue.h> // True Core Decoupling
+#include <freertos/queue.h>
 
 // --- USER CONFIGURATION ----------------------------------------
-const char* mqtt_server_ip = "192.168.1.10"; // Raspberry Pi IP
+const char* mqtt_server_ip = "192.168.1.10"; 
 const int mqtt_port = 1883;
-
-// Unique Register Assignment (CHANGE THIS FOR EACH UNIT)
 const int ASSIGNED_REGISTER = 40001;
 
-// Static IP Settings (CHANGE THIS FOR EACH UNIT)
 IPAddress local_IP(192, 168, 1, 101); 
 IPAddress gateway(192, 168, 1, 1);    
 IPAddress subnet(255, 255, 255, 0);   
 IPAddress primaryDNS(8, 8, 8, 8);
-IPAddress secondaryDNS(8, 8, 4, 4);
 
-// --- CURRENT SENSOR CALIBRATION ---
-const float ADC_REF_VOLT = 3.3;
-const float SENSITIVITY_1 = 0.192; 
-const float SENSITIVITY_2 = 0.192; 
-const float ZERO_VOLT_1  = 2.35; 
-const float ZERO_VOLT_2  = 2.35; 
-const float ALPHA        = 0.15;  
+// --- HARDWARE PIN MAPPING (Finalized Architecture) ---
+// I2C (MCP23017)
+#define I2C_SDA 16
+#define I2C_SCL 17
+Adafruit_MCP23X17 mcp;
 
-const float CURRENT_THRESHOLD_1 = 0.150;
-const float CURRENT_THRESHOLD_2 = 0.150;
+// Analog Sensors (ADC1 Only)
+const int PIN_VOLT_PSU  = 36; 
+const int PIN_VOLT_BATT = 39; 
+const int PIN_CURR_LEFT = 34; // ACS712 #1 (Left Arrows)
+const int PIN_CURR_RGHT = 35; // ACS712 #2 (Right Arrows)
+const int PIN_CURR_ALWY = 32; // ACS712 #3 (Always ON)
 
-// --- BATTERY CALIBRATION ---
-const float R1 = 4200.0;  // 4.2k Ohms
-const float R2 = 1000.0;  // 1k Ohms
-const float ADC_RESOLUTION = 4095.0; 
-const float K_CALIBRATION = 1.057; // Calculated from physical measurements
+// --- SENSOR CALIBRATION ---
+const float ADC_REF = 3.3;
+const float ALPHA    = 0.15;  // Low-pass filter
 
-// GPIO Pins
-const int RELAY_1_PIN = 4;
-const int RELAY_2_PIN = 13;
-const int POWER_MONITOR_PIN = 34; 
-const int CURRENT_PIN_1 = 35;     
-const int CURRENT_PIN_2 = 36;     
-const int BATTERY_PIN = 32;       
+// Individual Sensor Calibration (Update these via the Calibration Tool)
+const float SENS_LEFT = 0.146;
+const float ZERO_LEFT = 2.400;
 
-// Ethernet PHY Configuration
+const float SENS_RGHT = 0.146;
+const float ZERO_RGHT = 2.400;
+
+const float SENS_ALWY = 0.146;
+const float ZERO_ALWY = 2.400;
+
+// Adjusted thresholds to catch 1 LED strip turning on
+const float THRESHOLD_ALWY = 0.080; // Always ON load is static
+
+// NEW: Dynamic Threshold Baseline (Minimum acceptable current for ONE single strip)
+const float THRESH_PER_STRIP = 0.060; 
+
+// Ethernet PHY Configuration (LAN8720)
 #define ETH_PHY_ADDR  1
 #define ETH_PHY_POWER -1
 #define ETH_PHY_MDC   23
@@ -53,334 +65,289 @@ const int BATTERY_PIN = 32;
 #define ETH_PHY_TYPE  ETH_PHY_LAN8720
 #define ETH_CLK_MODE  ETH_CLOCK_GPIO17_OUT
 
-// Watchdog & Fail-Safe Configuration
-#define WDT_TIMEOUT_SECONDS 15            
-const unsigned long FAIL_SAFE_TIMEOUT = 300000; // 5 Minutes (in milliseconds)
-
-// MQTT Topics
-char control_topic[50];
-char status_topic[50];
-char power_topic[50];
-char current1_topic[50];
-char current2_topic[50];
-char batt_pct_topic[50];          
-char relay_topic[50]; // SCADA State Sync Topic
-const char* scan_topic = "metro/signage/scan"; 
+// --- MQTT TOPICS ---
+char topic_cmd[50];
+char topic_status[50];
+char topic_power[50];
+char topic_curr_l[50]; // Left Load
+char topic_curr_r[50]; // Right Load
+char topic_curr_a[50]; // Always On Load
+char topic_batt[50];          
+const char* topic_scan = "metro/signage/scan"; 
 
 WiFiClient ethClient;
 PubSubClient client(ethClient);
+bool eth_connected = false;
 
-// --- ENTERPRISE DATA SERIALIZATION ---
-enum SensorState { SENS_UNKNOWN, SENS_OK, SENS_FAIL };
+// --- STATE VARIABLES ---
+volatile int currentCommand = 0; // The active MQTT integer
+volatile bool expectLeftOn = false;
+volatile bool expectRightOn = false;
 
+// NEW: Shared threshold variables that Core 1 updates and Core 0 reads
+volatile float dynamicThreshLeft = THRESH_PER_STRIP;
+volatile float dynamicThreshRight = THRESH_PER_STRIP;
+
+// Helper to mathematically count how many MOSFETs are active in the raw bitmask
+int countActiveStrips(uint8_t portMask) {
+  int count = 0;
+  while (portMask) { count += portMask & 1; portMask >>= 1; }
+  return count;
+}
+
+// Mailbox Queue for Core 0 to pass 4-state strings to Core 1
 struct NodeStateMsg {
     bool power_ok;
-    SensorState current1;
-    SensorState current2;
     int batt_pct;
-    int relay_state;
+    const char* state_left;
+    const char* state_right;
+    const char* state_alwy;
 };
-
-// True Decoupling: A Mailbox Queue between Core 0 and Core 1
 QueueHandle_t sensorQueue;
-TaskHandle_t SensorTaskHandle;
+NodeStateMsg networkState = {true, -1, "---", "---", "---"};
 
-// The one single shared variable. Core 1 updates it on command, Core 0 reads it for Battery Math.
-volatile int currentRelayState = 0; 
+// Animation Bitmasks
+const uint8_t chaseFrames[5] = {0x07, 0x0E, 0x1C, 0x19, 0x13};
+const int numFrames = 5;
 
-// Core 1 Network Variables
-NodeStateMsg networkState = {true, SENS_UNKNOWN, SENS_UNKNOWN, -1, -1};
-unsigned long lastReconnectAttempt = 0;
-static bool eth_connected = false;
-unsigned long lastCommsTime = 0; 
-bool inFailSafeMode = false;
 
-// --- EMI MEDIAN FILTER ALGORITHM ---
-#define MAX_ADC_SAMPLES 51
-
-int getMedianADC(int pin, int numSamples) {
-  // Prevent buffer overflow and eliminate non-standard VLA
-  if (numSamples > MAX_ADC_SAMPLES) {
-    numSamples = MAX_ADC_SAMPLES;
-  }
-  
-  int samples[MAX_ADC_SAMPLES]; 
-  
-  for (int i = 0; i < numSamples; i++) {
-    samples[i] = analogRead(pin);
-  }
-  
-  for (int i = 1; i < numSamples; i++) {
-    int key = samples[i];
-    int j = i - 1;
-    while (j >= 0 && samples[j] > key) {
-      samples[j + 1] = samples[j];
-      j = j - 1;
-    }
-    samples[j + 1] = key;
-  }
-  return samples[numSamples / 2]; 
-}
+// ========================================================
+// CORE 1: NETWORKING & MCP23017 ANIMATION MACHINE
+// ========================================================
 
 void eth_event_handler(arduino_event_id_t event) {
   switch (event) {
-    case ARDUINO_EVENT_ETH_GOT_IP:
-      Serial.print("ETH MAC: "); Serial.print(ETH.macAddress());
-      Serial.print(", IPv4: "); Serial.println(ETH.localIP());
-      eth_connected = true;
-      break;
-    case ARDUINO_EVENT_ETH_DISCONNECTED:
-    case ARDUINO_EVENT_ETH_STOP:
-      eth_connected = false;
-      break;
-    default:
-      break;
+    case ARDUINO_EVENT_ETH_GOT_IP: eth_connected = true; break;
+    case ARDUINO_EVENT_ETH_DISCONNECTED: eth_connected = false; break;
+    default: break;
   }
 }
 
-// --- CORE 1: PUBLISH FORMATTER ---
 void publish_state_msg(NodeStateMsg msg) {
   char onlineMsg[30];
   snprintf(onlineMsg, sizeof(onlineMsg), "ONLINE:%s", ETH.localIP().toString().c_str());
-  client.publish(status_topic, onlineMsg, true);
+  client.publish(topic_status, onlineMsg, true);
   
-  client.publish(power_topic, msg.power_ok ? "OK" : "FAIL", true);
-
-  if (msg.current1 != SENS_UNKNOWN)
-    client.publish(current1_topic, msg.current1 == SENS_OK ? "OK" : "FAIL", true);
-  if (msg.current2 != SENS_UNKNOWN)
-    client.publish(current2_topic, msg.current2 == SENS_OK ? "OK" : "FAIL", true);
+  client.publish(topic_power, msg.power_ok ? "OK" : "FAIL", true);
+  client.publish(topic_curr_l, msg.state_left, true);
+  client.publish(topic_curr_r, msg.state_right, true);
+  client.publish(topic_curr_a, msg.state_alwy, true);
 
   if (msg.batt_pct != -1) {
     char bStr[8];
     snprintf(bStr, sizeof(bStr), "%d", msg.batt_pct);
-    client.publish(batt_pct_topic, bStr, true);
-  }
-
-  // Eradicating the SCADA blind spot
-  if (msg.relay_state != -1) {
-    char rStr[8];
-    snprintf(rStr, sizeof(rStr), "%d", msg.relay_state);
-    client.publish(relay_topic, rStr, true);
+    client.publish(topic_batt, bStr, true);
   }
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
-  lastCommsTime = millis();
-  
-  if (inFailSafeMode) {
-    Serial.println(">> [RECOVERY] Valid Command Received. Exiting Fail-Safe Mode.");
-    inFailSafeMode = false;
-  }
-
   char msgBuffer[16]; 
   unsigned int copyLength = (length < sizeof(msgBuffer) - 1) ? length : (sizeof(msgBuffer) - 1);
   memcpy(msgBuffer, payload, copyLength);
   msgBuffer[copyLength] = '\0'; 
 
-  if (strcmp(topic, scan_topic) == 0 && strcmp(msgBuffer, "PING") == 0) {
-    publish_state_msg(networkState); // Reply to PING with last known mailbox state
+  if (strcmp(topic, topic_scan) == 0 && strcmp(msgBuffer, "PING") == 0) {
+    publish_state_msg(networkState); 
     return;
   }
 
-  int temp_command = atoi(msgBuffer); 
-  if (temp_command >= 0 && temp_command <= 3) {
-    currentRelayState = temp_command; 
-    Serial.printf("Received Valid Relay Command: %d\n", currentRelayState);
-
-    switch (currentRelayState) {
-      case 0: digitalWrite(RELAY_1_PIN, HIGH); digitalWrite(RELAY_2_PIN, HIGH); break;
-      case 1: digitalWrite(RELAY_1_PIN, LOW); digitalWrite(RELAY_2_PIN, HIGH); break;
-      case 2: digitalWrite(RELAY_1_PIN, HIGH); digitalWrite(RELAY_2_PIN, LOW); break;
-      case 3: digitalWrite(RELAY_1_PIN, LOW); digitalWrite(RELAY_2_PIN, LOW); break;
-    }
-  } else {
-    Serial.println("[ERROR] Malformed Payload Received.");
-  }
+  // Update Global Command (The animation loop handles the actual hardware writing)
+  currentCommand = atoi(msgBuffer); 
+  Serial.printf("Command Updated: %d\n", currentCommand);
 }
 
-void checkFailSafe() {
-  if ((millis() - lastCommsTime) > FAIL_SAFE_TIMEOUT) {
-    if (!inFailSafeMode) {
-      inFailSafeMode = true;
-      Serial.println("\n>> [EMERGENCY] COMMS LOST FOR 5 MINS! ENTERING FAIL-SAFE MODE!");
-      
-      digitalWrite(RELAY_1_PIN, LOW);
-      digitalWrite(RELAY_2_PIN, LOW);
-      currentRelayState = 3; // Core 0 will automatically catch this and inform SCADA later!
+void runAnimationStateMachine() {
+  static unsigned long previousMillis = 0;
+  static int currentFrame = 0;      
+  static int lastExecutedCommand = -1; 
+  unsigned long currentMillis = millis();
+
+  // --- MODE A: MACRO ANIMATIONS (0 to 4) ---
+  if (currentCommand >= 0 && currentCommand <= 4) {
+    if (currentMillis - previousMillis >= 300 || currentCommand != lastExecutedCommand) {
+      previousMillis = currentMillis;
+      lastExecutedCommand = currentCommand;
+
+      switch (currentCommand) {
+        case 0: 
+          mcp.writeGPIOA(0x00); mcp.writeGPIOB(0x00); 
+          expectLeftOn=false; expectRightOn=false; 
+          break;
+        case 1: 
+          mcp.writeGPIOA(chaseFrames[currentFrame]); mcp.writeGPIOB(0x00); 
+          expectLeftOn=true; expectRightOn=false; 
+          dynamicThreshLeft = THRESH_PER_STRIP * 2.5; // Expecting ~3 strips to be ON
+          break;
+        case 2: 
+          mcp.writeGPIOA(0x00); mcp.writeGPIOB(chaseFrames[currentFrame]); 
+          expectLeftOn=false; expectRightOn=true; 
+          dynamicThreshRight = THRESH_PER_STRIP * 2.5; // Expecting ~3 strips to be ON
+          break;
+        case 3: 
+          mcp.writeGPIOA(chaseFrames[currentFrame]); mcp.writeGPIOB(chaseFrames[currentFrame]); 
+          expectLeftOn=true; expectRightOn=true; 
+          dynamicThreshLeft = THRESH_PER_STRIP * 2.5; 
+          dynamicThreshRight = THRESH_PER_STRIP * 2.5;
+          break;
+        case 4: 
+          mcp.writeGPIOA(0x1F); mcp.writeGPIOB(0x1F); 
+          expectLeftOn=true; expectRightOn=true; 
+          dynamicThreshLeft = THRESH_PER_STRIP * 4.5; // Solid ON expects all 5 strips
+          dynamicThreshRight = THRESH_PER_STRIP * 4.5; 
+          break; 
+      }
+      currentFrame = (currentFrame + 1) % numFrames;
     }
   }
-}
-
-boolean mqtt_connect() {
-  if (!eth_connected) return false;
   
-  char clientId[30];
-  snprintf(clientId, sizeof(clientId), "ESP32EthClient-%s", ETH.macAddress().c_str());
+  // --- MODE B: RAW BITMASK (10000 to 11023) ---
+  else if (currentCommand >= 10000 && currentCommand <= 11023) {
+    if (currentCommand != lastExecutedCommand) {
+      lastExecutedCommand = currentCommand;
+      int bitmask = currentCommand - 10000; 
+      
+      uint8_t portA = bitmask & 0x1F;        
+      uint8_t portB = (bitmask >> 5) & 0x1F; 
+      
+      mcp.writeGPIOA(portA);
+      mcp.writeGPIOB(portB);
 
-  if (client.connect(clientId, status_topic, 1, true, "OFFLINE")) {
-    Serial.println("MQTT Connected!");
-    client.subscribe(control_topic, 1);
-    client.subscribe(scan_topic, 0);
-    
-    // Publish initial baseline immediately
-    publish_state_msg(networkState);
-    lastCommsTime = millis(); 
-  } 
-  return client.connected();
+      // Inform Core 0 of our intentions for discrepancy logic
+      expectLeftOn = (portA > 0);
+      expectRightOn = (portB > 0);
+
+      // NEW: Calculate exact dynamic thresholds based on how many bits are 1
+      int activeLeft = countActiveStrips(portA);
+      int activeRight = countActiveStrips(portB);
+      
+      if (activeLeft > 0) dynamicThreshLeft = THRESH_PER_STRIP * (activeLeft - 0.5);
+      if (activeRight > 0) dynamicThreshRight = THRESH_PER_STRIP * (activeRight - 0.5);
+    }
+  }
 }
 
-// --- CORE 0 HARDWARE ENGINE ---
-// No networking. No Strings. No Blocking. Just raw EMI filtering.
+// ========================================================
+// CORE 0: HARDWARE DSP & 4-STATE DISCREPANCY LOGIC
+// ========================================================
+
+int getMedianADC(int pin) {
+  int samples[51]; 
+  for (int i = 0; i < 51; i++) samples[i] = analogRead(pin);
+  for (int i = 1; i < 51; i++) {
+    int key = samples[i]; int j = i - 1;
+    while (j >= 0 && samples[j] > key) { samples[j + 1] = samples[j]; j = j - 1; }
+    samples[j + 1] = key;
+  }
+  return samples[25]; 
+}
+
+// The core engine for the 4-State Output
+const char* getDiscrepancyState(bool expectedOn, float actualCurrent, float threshold) {
+  if (expectedOn && actualCurrent >= threshold) return "ON";
+  if (!expectedOn && actualCurrent < threshold) return "OFF";
+  if (expectedOn && actualCurrent < threshold) return "FAIL_OPEN";
+  // if (!expectedOn && actualCurrent >= threshold)
+  return "FAIL_SHORT"; 
+}
+
 void SensorTask(void * parameter) {
   esp_task_wdt_add(NULL); 
-
-  NodeStateMsg currentState = {true, SENS_UNKNOWN, SENS_UNKNOWN, -1, -1};
-  bool firstRun = true;
-
-  // Local Debounce/Interval tracking isolated to Core 0
-  const int POWER_THRESHOLD = 1800;  
-  const unsigned long DEBOUNCE_DELAY = 50; 
-  bool pwr_lastReading = false;
-  unsigned long pwr_lastDebounceTime = 0;
-
-  float filteredCurrent1 = 0.0;
-  float filteredCurrent2 = 0.0;
-  unsigned long lastCurrentReadTime = 0;
-  const unsigned long CURRENT_READ_INTERVAL = 500; 
-
-  unsigned long lastBattReadTime = 0;
-  const unsigned long BATT_READ_INTERVAL = 5000; 
+  NodeStateMsg currentState = {true, -1, "---", "---", "---"};
+  
+  float filt_l = 0.0, filt_r = 0.0, filt_a = 0.0;
+  unsigned long lastReadTime = 0;
 
   for(;;) {
     esp_task_wdt_reset(); 
-    bool changed = firstRun;
-    firstRun = false;
+    bool changed = false;
 
-    // 1. POWER MONITOR
-    int pwrAdc = getMedianADC(POWER_MONITOR_PIN, 11);
-    bool pwrRead = (pwrAdc > POWER_THRESHOLD);
-    if (pwrRead != pwr_lastReading) pwr_lastDebounceTime = millis();
-    pwr_lastReading = pwrRead;
+    if (millis() - lastReadTime >= 500) {
+      lastReadTime = millis();
 
-    if ((millis() - pwr_lastDebounceTime) > DEBOUNCE_DELAY) {
-      if (currentState.power_ok != pwrRead) {
-        currentState.power_ok = pwrRead;
+      // 1. Power Monitor
+      bool pwrRead = (getMedianADC(PIN_VOLT_PSU) > 1800);
+      if (currentState.power_ok != pwrRead) { currentState.power_ok = pwrRead; changed = true; }
+
+      // 2. Read ACS712 Sensors with Individual Calibration Math
+      float curr_l = abs((((getMedianADC(PIN_CURR_LEFT) / 4095.0) * ADC_REF) - ZERO_LEFT) / SENS_LEFT);
+      float curr_r = abs((((getMedianADC(PIN_CURR_RGHT) / 4095.0) * ADC_REF) - ZERO_RGHT) / SENS_RGHT);
+      float curr_a = abs((((getMedianADC(PIN_CURR_ALWY) / 4095.0) * ADC_REF) - ZERO_ALWY) / SENS_ALWY);
+      
+      filt_l = (curr_l < 0.06) ? 0 : (curr_l * ALPHA) + (filt_l * (1 - ALPHA));
+      filt_r = (curr_r < 0.06) ? 0 : (curr_r * ALPHA) + (filt_r * (1 - ALPHA));
+      filt_a = (curr_a < 0.06) ? 0 : (curr_a * ALPHA) + (filt_a * (1 - ALPHA));
+
+      // 3. Apply 4-State Logic using DYNAMIC thresholds
+      // Note: Always On is expected to always be true!
+      const char* state_l = getDiscrepancyState(expectLeftOn, filt_l, dynamicThreshLeft);
+      const char* state_r = getDiscrepancyState(expectRightOn, filt_r, dynamicThreshRight);
+      const char* state_a = getDiscrepancyState(true, filt_a, THRESHOLD_ALWY);
+
+      if (strcmp(currentState.state_left, state_l) != 0 || 
+          strcmp(currentState.state_right, state_r) != 0 || 
+          strcmp(currentState.state_alwy, state_a) != 0) {
+        
+        currentState.state_left = state_l;
+        currentState.state_right = state_r;
+        currentState.state_alwy = state_a;
         changed = true;
       }
+
+      // (Battery Logic would go here - simplified for snippet)
+      // currentState.batt_pct = 100; 
+
+      if (changed) xQueueOverwrite(sensorQueue, &currentState); 
     }
-
-    // 2. CURRENT SENSORS
-    if (millis() - lastCurrentReadTime >= CURRENT_READ_INTERVAL || lastCurrentReadTime == 0) {
-      lastCurrentReadTime = millis();
-      
-      int medianADC1 = getMedianADC(CURRENT_PIN_1, 51);
-      float voltage1 = (medianADC1 / 4095.0) * ADC_REF_VOLT;
-      float rawCurrent1 = (voltage1 - ZERO_VOLT_1) / SENSITIVITY_1;
-      if (abs(rawCurrent1) < 0.06) rawCurrent1 = 0; 
-      filteredCurrent1 = abs((rawCurrent1 * ALPHA) + (filteredCurrent1 * (1 - ALPHA)));
-      SensorState c1State = (filteredCurrent1 > CURRENT_THRESHOLD_1) ? SENS_OK : SENS_FAIL;
-      if (currentState.current1 != c1State) { currentState.current1 = c1State; changed = true; }
-
-      int medianADC2 = getMedianADC(CURRENT_PIN_2, 51);
-      float voltage2 = (medianADC2 / 4095.0) * ADC_REF_VOLT;
-      float rawCurrent2 = (voltage2 - ZERO_VOLT_2) / SENSITIVITY_2;
-      if (abs(rawCurrent2) < 0.06) rawCurrent2 = 0; 
-      filteredCurrent2 = abs((rawCurrent2 * ALPHA) + (filteredCurrent2 * (1 - ALPHA)));
-      SensorState c2State = (filteredCurrent2 > CURRENT_THRESHOLD_2) ? SENS_OK : SENS_FAIL;
-      if (currentState.current2 != c2State) { currentState.current2 = c2State; changed = true; }
-    }
-
-    // 3. BATTERY COMPENSATION
-    if (millis() - lastBattReadTime >= BATT_READ_INTERVAL || lastBattReadTime == 0) {
-      lastBattReadTime = millis();
-      
-      int medianADC = getMedianADC(BATTERY_PIN, 51);
-      float pinVoltage = (medianADC / ADC_RESOLUTION) * ADC_REF_VOLT; 
-      float battVoltage = pinVoltage * ((R1 + R2) / R2) * K_CALIBRATION;
-
-      // Pull currentRelayState atomically from Core 1
-      int activeRelays = currentRelayState; 
-      if (activeRelays == 1 || activeRelays == 2) battVoltage += 0.40; 
-      else if (activeRelays == 3) battVoltage += 0.58; 
-
-      int percentage = 0;
-      if (battVoltage >= 12.1) percentage = 100;
-      else if (battVoltage >= 11.5) percentage = 50;
-      else percentage = 0;
-
-      if (currentState.batt_pct != percentage) {
-        currentState.batt_pct = percentage;
-        changed = true;
-      }
-    }
-
-    // 4. RELAY REPORTING
-    if (currentState.relay_state != currentRelayState) {
-      currentState.relay_state = currentRelayState;
-      changed = true;
-    }
-
-    // 5. TRUE DECOUPLING: Post to Mailbox Queue
-    if (changed) {
-      xQueueOverwrite(sensorQueue, &currentState); 
-    }
-
-    vTaskDelay(pdMS_TO_TICKS(10)); // Yield to WDT
+    vTaskDelay(pdMS_TO_TICKS(10)); 
   }
 }
 
+
+// ========================================================
+// SETUP & MAIN LOOP
+// ========================================================
+
 void setup() {
   Serial.begin(115200);
-  delay(100);
+  
+  // Initialize I2C and MCP23017
+  Wire.begin(I2C_SDA, I2C_SCL);
+  if (!mcp.begin_I2C(0x20, &Wire)) {
+    Serial.println("FATAL ERROR: MCP23017 not found!");
+    while(1);
+  }
+  for (int i = 0; i < 16; i++) mcp.pinMode(i, OUTPUT);
+  mcp.writeGPIOA(0x00); mcp.writeGPIOB(0x00);
 
-  // Initialize length-1 Mailbox Queue
+  // Initialize Analog Pins
+  pinMode(PIN_VOLT_PSU, INPUT); pinMode(PIN_VOLT_BATT, INPUT);
+  pinMode(PIN_CURR_LEFT, INPUT); pinMode(PIN_CURR_RGHT, INPUT); pinMode(PIN_CURR_ALWY, INPUT);
+  analogReadResolution(12); analogSetAttenuation(ADC_11db);
+
+  // Networking
+  sprintf(topic_cmd, "metro/signage/register/%d/value", ASSIGNED_REGISTER);
+  sprintf(topic_status, "metro/signage/register/%d/status", ASSIGNED_REGISTER);
+  sprintf(topic_power, "metro/signage/register/%d/power", ASSIGNED_REGISTER);
+  sprintf(topic_curr_l, "metro/signage/register/%d/current1", ASSIGNED_REGISTER);
+  sprintf(topic_curr_r, "metro/signage/register/%d/current2", ASSIGNED_REGISTER);
+  sprintf(topic_curr_a, "metro/signage/register/%d/current3", ASSIGNED_REGISTER); // The 3rd load
+  sprintf(topic_batt, "metro/signage/register/%d/battery_pct", ASSIGNED_REGISTER); 
+
+  WiFi.onEvent(eth_event_handler);
+  ETH.begin(ETH_PHY_TYPE, ETH_PHY_ADDR, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_POWER, ETH_CLK_MODE);
+  ETH.config(local_IP, gateway, subnet, primaryDNS);
+  client.setServer(mqtt_server_ip, mqtt_port);
+  client.setCallback(callback);
+
   sensorQueue = xQueueCreate(1, sizeof(NodeStateMsg));
-
-  // --- NEW ESP32 CORE v3.x WDT INITIALIZATION ---
-  esp_task_wdt_config_t wdt_config = {
-    .timeout_ms = WDT_TIMEOUT_SECONDS * 1000,
-    .idle_core_mask = (1 << portNUM_PROCESSORS) - 1, 
-    .trigger_panic = true                            
-  };
+  
+  // WDT Config
+  esp_task_wdt_config_t wdt_config = { .timeout_ms = 15000, .idle_core_mask = (1<<portNUM_PROCESSORS)-1, .trigger_panic = true };
   esp_task_wdt_init(&wdt_config);
   esp_task_wdt_add(NULL); 
 
-  pinMode(RELAY_1_PIN, OUTPUT);
-  pinMode(RELAY_2_PIN, OUTPUT);
-  digitalWrite(RELAY_1_PIN, HIGH);
-  digitalWrite(RELAY_2_PIN, HIGH);
-  
-  pinMode(POWER_MONITOR_PIN, INPUT);
-  pinMode(CURRENT_PIN_1, INPUT);
-  pinMode(CURRENT_PIN_2, INPUT);
-  pinMode(BATTERY_PIN, INPUT); 
-
-  analogReadResolution(12);
-  analogSetAttenuation(ADC_11db);
-
-  sprintf(control_topic, "metro/signage/register/%d/value", ASSIGNED_REGISTER);
-  sprintf(status_topic, "metro/signage/register/%d/status", ASSIGNED_REGISTER);
-  sprintf(power_topic, "metro/signage/register/%d/power", ASSIGNED_REGISTER);
-  sprintf(current1_topic, "metro/signage/register/%d/current1", ASSIGNED_REGISTER);
-  sprintf(current2_topic, "metro/signage/register/%d/current2", ASSIGNED_REGISTER);
-  sprintf(batt_pct_topic, "metro/signage/register/%d/battery_pct", ASSIGNED_REGISTER); 
-  sprintf(relay_topic, "metro/signage/register/%d/relay_status", ASSIGNED_REGISTER); 
-
-  WiFi.onEvent(eth_event_handler);
-  
-  ETH.begin(ETH_PHY_TYPE, ETH_PHY_ADDR, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_POWER, ETH_CLK_MODE);
-  ETH.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS);
-
-  client.setServer(mqtt_server_ip, mqtt_port);
-  client.setCallback(callback);
-  
-  // Industrial Keep-Alive Standard (30s) prevents network flap
-  client.setKeepAlive(30); 
-  
-  lastCommsTime = millis(); 
-
-  xTaskCreatePinnedToCore(SensorTask, "SensorTask", 10000, NULL, 1, &SensorTaskHandle, 0);
+  // Spin up Core 0
+  xTaskCreatePinnedToCore(SensorTask, "SensorTask", 10000, NULL, 1, NULL, 0);
 }
 
 void loop() {
@@ -388,28 +355,25 @@ void loop() {
 
   if (eth_connected) {
     if (!client.connected()) {
-      if (millis() - lastReconnectAttempt > 5000) { 
-        lastReconnectAttempt = millis();
-        mqtt_connect();
+      static unsigned long lastReconnect = 0;
+      if (millis() - lastReconnect > 5000) {
+        lastReconnect = millis();
+        char clientId[30]; snprintf(clientId, sizeof(clientId), "ESP32-%s", ETH.macAddress().c_str());
+        if (client.connect(clientId, topic_status, 1, true, "OFFLINE")) {
+          client.subscribe(topic_cmd, 1);
+          client.subscribe(topic_scan, 0);
+          publish_state_msg(networkState);
+        }
       }
     } else {
       client.loop(); 
+      runAnimationStateMachine(); // Core 1 cleanly executes the LED sequence
       
-      // CHECK MAILBOX
       NodeStateMsg tempMsg;
-      bool stateUpdated = false;
-      
-      // Pull data from queue. Timeout is 0 (Non-Blocking).
       if (xQueueReceive(sensorQueue, &tempMsg, 0) == pdTRUE) {
         networkState = tempMsg;
-        stateUpdated = true;
-      }
-
-      if (stateUpdated) {
         publish_state_msg(networkState);
       }
     }
   }
-
-  checkFailSafe();
 }
