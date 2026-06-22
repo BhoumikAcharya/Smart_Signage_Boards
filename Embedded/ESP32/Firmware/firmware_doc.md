@@ -18,7 +18,8 @@ This firmware utilizes FreeRTOS to strictly decouple network operations from hig
 ## 2. Hardware Pin Mapping
 
 ### Ethernet PHY (LAN8720) - Hardwired
-* **GPIO 0, 18, 19, 21, 22, 23, 25, 26, 27** ### I2C Bus (MCP23017 Expander)
+* **GPIO 0, 18, 19, 21, 22, 23, 25, 26, 27** 
+### I2C Bus (MCP23017 Expander)
 * **GPIO 16:** I2C SDA
 * **GPIO 17:** I2C SCL
 

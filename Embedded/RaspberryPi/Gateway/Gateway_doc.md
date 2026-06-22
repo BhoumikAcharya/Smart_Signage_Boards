@@ -1,97 +1,118 @@
-## Raspberry Pi Modbus-MQTT Bridge
+# Metro Signage IoT: Raspberry Pi Bridge
 
-Name: Bhoumik Acharya
+**Version:** 1.0.1
 
-Date: 06/05/2026
+**Role:** Master Translation Gateway (Modbus TCP ↔ MQTT)
 
-Version: 1.0.1
+## 📌 Overview
 
-Role: Master Translation Gateway
+This Python application is the central nervous system of the Metro Signage IoT network. It serves as an industrial protocol bridge, translating commands from a legacy SCADA/PLC system (via Modbus TCP) into lightweight IoT messages (via MQTT) for up to 100 ESP32 edge nodes.
 
-### 1. Architectural Overview
+It runs a fully local Modbus TCP server, maintains thread-safe state dictionaries, handles Hand/Off/Auto (MUX) switching, and presents a flicker-free CLI dashboard for real-time monitoring.
 
-This Python application serves as the central nervous system of the Metro Signage network. It runs a local PyModbus TCP Server to communicate with the industrial SCADA/PLC system and simultaneously runs a Paho-MQTT client to communicate with up to 100 ESP32 edge nodes.
+## 🏗️ System Architecture
 
-The application operates on a multi-threaded architecture:
+The application utilizes a robust multi-threaded design to prevent network blocking and ensure zero-latency translation:
 
-- Main Thread: Manages the Modbus memory translation, MUX logic, and the ANSI-escaped terminal UI.
+1. **Main Thread (Logic & UI):** Handles the Modbus memory translation, MUX routing, array comparisons, and renders the ANSI-escaped terminal UI.
 
-- Modbus Thread: A daemon thread running StartTcpServer.
+2. **Modbus Thread (SCADA Facing):** A daemon thread running `pymodbus.server` listening on port `502`.
 
-- MQTT Thread: A background thread managed by Paho-MQTT's loop_start() handling asynchronous inbound messages from the edge nodes.
+3. **MQTT Thread (Edge Facing):** A background thread managed by Paho-MQTT's `loop_start()` handling asynchronous inbound telemetry from the ESP32 nodes.
+
+## ✨ Key Features
+
+### 1. Air-Gapped Network Support
+
+The Modbus server binds to `0.0.0.0`, allowing the Raspberry Pi to operate with dual IP addresses. The internal `eth0` interface can host the isolated ESP32 MQTT network, while an alias IP or USB-Ethernet adapter handles the external Modbus SCADA traffic.
 
 ### 2. Thread-Safe State Management
 
-    To prevent data tearing when the MQTT thread writes data and the Main thread reads data, the system uses threading.Lock() (instantiated as data_lock).
+To prevent data tearing when the background MQTT thread receives data at the exact microsecond the Main thread is reading it, a `threading.Lock()` (`data_lock`) isolates all global telemetry dictionaries.
 
-- #### Global Dictionaries (The State Buffer)
+### 3. HMI / SCADA MUX Logic (Hand/Off/Auto)
 
-    The application maintains 5 primary dictionaries, keyed by the Modbus Address (e.g., 40001):
+The bridge supports seamless switching between Automated SCADA control and Manual HMI control without losing state tracking:
 
-    - device_statuses = {} | Stores "ONLINE:<IP>" or "OFFLINE".
+* Modbus Register `43001` acts as the MUX flag.
 
-    - device_power_states = {} | Stores main PSU health: "OK", "FAIL", or "---".
+* If `0` (Auto): The bridge copies commands from the SCADA buffer (`42001+`) to the active execution zone (`40001+`).
 
-    - device_current1 = {} | Stores Load 1 health: "OK", "FAIL", or "---".
+* If `1` (Manual): The bridge locks out SCADA and copies commands from the HMI buffer (`41001+`) to the execution zone.
 
-    - device_current2 = {} | Stores Load 2 health: "OK", "FAIL", or "---".
+### 4. 4-State Discrepancy Translation
 
-    - device_batt_pct = {} | Stores battery percentage as a string: "100", "50", "0", or "---".
+The ESP32 nodes send intelligent diagnostic strings instead of binary OK/FAIL states. The bridge intercepts these strings and translates them into integers for SCADA diagnostics:
 
-### 3. Core Functions
+* `"OFF"` ➔ `0` (Intended OFF, no current)
 
-- #### on_message(client, userdata, msg)
+* `"ON"` ➔ `1` (Intended ON, current flowing)
 
-    - Trigger: Fires asynchronously whenever a subscribed MQTT topic receives a payload.
+* `"FAIL_OPEN"` ➔ `2` (Intended ON, but 0 Amps flowing — e.g., burnt LED)
 
-    - Logic: 1. Splits the topic string to extract the register_address (e.g., 40001) and the msg_type (e.g., power) 2. Acquires data_lock, 3. Updates the corresponding global dictionary, 4. If the status is "OFFLINE", it actively scrubs the other dictionaries for that node, resetting them to "---" to prevent the UI from displaying stale, inaccurate sensor data.
+* `"FAIL_SHORT"` ➔ `3` (Intended OFF, but current flowing — e.g., welded relay)
 
-    - Fault Tolerance: Wrapped in a silent try/except block. If an ESP32 sends a malformed packet, the function aborts rather than crashing the bridge.
+### 5. Ghost Message Purging & Retained States
 
-- #### perform_startup_cleanup(client)
+On startup, the bridge executes `perform_startup_cleanup()`. It publishes `"OFFLINE"` and `"---"` to all 100 nodes with `retain=True`. This purges the Mosquitto broker's database of any stale data from previous unexpected shutdowns, ensuring the UI and SCADA always start with a clean slate.
 
-    - Trigger: Runs once upon successful connection to the MQTT broker (mqtt_connected_event.wait()).
+### 6. Hardware Watchdog Pinging
 
-    - Logic: Iterates through all 100 possible nodes. It publishes "OFFLINE" and "---" to all status/sensor topics with retain=True. This purges the Mosquitto broker's database of any "ghost" data left over from previous unexpected shutdowns.
+The Main thread broadcasts a `"PING"` payload to the `metro/signage/scan` topic every 60 seconds. This resets the hardware fail-safe timers (Dead-Man Switch) programmed into the ESP32 microcontrollers.
 
-- #### bridge_and_display_loop(modbus_context, mqtt_client)
+## 🗺️ Modbus Memory Map
 
-    - This is the infinite while True loop running on the Main thread.
+The system uses a highly structured memory map allowing the PLC to control and diagnose 100 unique nodes seamlessly.
 
-    - Heartbeat (PING): Checks time.time(). Every 60 seconds, it publishes "PING" to metro/signage/scan. This resets the hardware fail-safe timers on all ESP32s.
+| Memory Block | Range | Description | 
+| ----- | ----- | ----- | 
+| **Active Execution Zone** | `40001 - 40100` | The actual commands (0-3 or 10000+ Modbus offset) sent to the ESP32s. | 
+| **HMI Manual Buffer** | `41001 - 41100` | Commands queued by the local Graphical HMI. | 
+| **SCADA Auto Buffer** | `42001 - 42100` | Commands queued by the central PLC. | 
+| **MUX Control Flag** | `43001` | `0` = Read from SCADA Buffer, `1` = Read from HMI Buffer. | 
+| **Diagnostic Block** | `45001 - 45600` | 6 continuous telemetry registers per node (See below). | 
 
-    - MUX Logic: Reads Modbus Register 43001 (Index 3000).
+### Diagnostic Register Layout (Per Node)
 
-        - If 1 (HMI mode), it copies memory from 41001-41100 into the active output zone 40001-40100.
+Each node occupies exactly 6 registers in the `45001+` diagnostic block. For example, Node 1 (40001) occupies `45001 - 45006`. Node 2 (40002) occupies `45007 - 45012`.
 
-        - If 0 (SCADA mode), it copies memory from 42001-42100 into the active output zone.
+1. **Network Status:** `1` = Online, `0` = Offline
 
-    - Command Dispatch: Compares the active output zone against last_known_values. If a change occurred, it publishes the new integer command (0-3) to the ESP32 via MQTT with retain=True.
+2. **Main Power:** `1` = OK, `0` = PSU Failure
 
-    - SCADA Diagnostic Translation: Converts the text-based global dictionaries into pure 16-bit integers so the PLC can read them. It writes 6 sequential registers per node to the 45001+ block.
+3. **LHS LED Health:** `0`, `1`, `2`, or `3` (via 4-State logic)
 
-        - Reg 1: Status (1=Online, 0=Offline)
+4. **RHS LED Health:** `0`, `1`, `2`, or `3` (via 4-State logic)
 
-        - Reg 2: Power (1=OK, 0=Fail)
+5. **Battery Percentage:** `0` to `100` (%)
 
-        - Reg 3: Current1 (1=OK, 0=Fail)
+6. **Static LED Health:** `0`, `1`, `2`, or `3` (via 4-State logic)
 
-        - Reg 4: Current2 (1=OK, 0=Fail)
+## 🚀 Installation & Usage
 
-        - Reg 5: Battery (0-100 integer)
+### 1. Prerequisites
 
-        - Reg 6: Buffer (Reserved)
+Ensure you have Python 3 installed along with a running instance of Eclipse Mosquitto on the Raspberry Pi.
 
-    - UI Rendering: Uses \033[H (Cursor Home) and \033[J (Clear to end) to draw a static, double-buffered terminal UI without CPU-intensive clearing.
+```bash
+sudo apt update
+sudo apt install mosquitto mosquitto-clients python3-venv
+```
 
-### 4. Modbus Memory Map Summary
+### 2. Install Dependencies
 
-- 40001 - 40100: Active Relay Commands (0-3). Translated directly to MQTT.
+It is highly recommended to use a virtual environment to satisfy PEP-668 requirements.
 
-- 41001 - 41100: HMI Manual Command Buffer.
+```bash
+python3 -m venv bridge_env
+source bridge_env/bin/activate
+pip install paho-mqtt pymodbus
+```
 
-- 42001 - 42100: SCADA Automated Command Buffer.
+### 3. Run the Bridge
 
-- 43001: MUX Switch (0=SCADA, 1=HMI).
+```bash
+python3 rpi_v1.py
+```
 
-- 45001 - 45600: Diagnostic Block (6 registers per node, reporting health up to PLC).
+You will see the screen clear, the startup cleanup execute, and the double-buffered terminal dashboard appear tracking all nodes in real-time.

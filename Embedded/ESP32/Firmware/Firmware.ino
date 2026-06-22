@@ -1,7 +1,7 @@
 /*
- * ESP32 Enterprise Signage Controller
- * Architecture: MCP23017 I2C (10-Ch MOSFETs) + 4x ACS712
- * Features: Non-blocking animations, 4-State Discrepancy Logic, Modbus Offset
+ * ESP32 Enterprise Signage Controller (Firmware v2.0)
+ * Architecture: MCP23017 I2C (10-Ch MOSFETs) + 3x ACS712
+ * Features: Non-blocking animations, 4-State Discrepancy Logic, Modbus Offset, Dynamic Thresholds
  */
 
 #include <ETH.h>
@@ -39,7 +39,7 @@ const int PIN_CURR_ALWY = 32; // ACS712 #3 (Always ON)
 
 // --- SENSOR CALIBRATION ---
 const float ADC_REF = 3.3;
-const float ALPHA    = 0.15;  // Low-pass filter
+const float ALPHA   = 0.15;  // Low-pass filter
 
 // Individual Sensor Calibration (Update these via the Calibration Tool)
 const float SENS_LEFT = 0.146;
@@ -51,11 +51,17 @@ const float ZERO_RGHT = 2.400;
 const float SENS_ALWY = 0.146;
 const float ZERO_ALWY = 2.400;
 
-// Adjusted thresholds to catch 1 LED strip turning on
-const float THRESHOLD_ALWY = 0.080; // Always ON load is static
+// --- BATTERY CALIBRATION ---
+/*
+const float BATT_R1 = 42000.0; 
+const float BATT_R2 = 10000.0; 
+const float K_CALIBRATION = 1.063; // Your exact multiplier from the standalone test
+const float SAG_PER_STRIP = 0.05;  // CALIBRATE THIS: Voltage drop caused by 1 single LED strip
+*/
 
-// NEW: Dynamic Threshold Baseline (Minimum acceptable current for ONE single strip)
+// Dynamic Threshold Baseline (Minimum acceptable current for ONE single strip)
 const float THRESH_PER_STRIP = 0.060; 
+const float THRESHOLD_ALWY   = 0.080; // Always ON load is static
 
 // Ethernet PHY Configuration (LAN8720)
 #define ETH_PHY_ADDR  1
@@ -72,7 +78,7 @@ char topic_power[50];
 char topic_curr_l[50]; // Left Load
 char topic_curr_r[50]; // Right Load
 char topic_curr_a[50]; // Always On Load
-char topic_batt[50];          
+// char topic_batt[50];          
 const char* topic_scan = "metro/signage/scan"; 
 
 WiFiClient ethClient;
@@ -84,32 +90,27 @@ volatile int currentCommand = 0; // The active MQTT integer
 volatile bool expectLeftOn = false;
 volatile bool expectRightOn = false;
 
-// NEW: Shared threshold variables that Core 1 updates and Core 0 reads
+// NEW: Track exactly how many strips are currently lit to calculate battery sag
+// volatile int totalActiveStrips = 0; 
+
+// Shared threshold variables that Core 1 updates and Core 0 reads
 volatile float dynamicThreshLeft = THRESH_PER_STRIP;
 volatile float dynamicThreshRight = THRESH_PER_STRIP;
-
-// Helper to mathematically count how many MOSFETs are active in the raw bitmask
-int countActiveStrips(uint8_t portMask) {
-  int count = 0;
-  while (portMask) { count += portMask & 1; portMask >>= 1; }
-  return count;
-}
 
 // Mailbox Queue for Core 0 to pass 4-state strings to Core 1
 struct NodeStateMsg {
     bool power_ok;
-    int batt_pct;
+    // int batt_pct;
     const char* state_left;
     const char* state_right;
     const char* state_alwy;
 };
 QueueHandle_t sensorQueue;
-NodeStateMsg networkState = {true, -1, "---", "---", "---"};
+NodeStateMsg networkState = {true, "---", "---", "---"};
 
 // Animation Bitmasks
 const uint8_t chaseFrames[5] = {0x07, 0x0E, 0x1C, 0x19, 0x13};
 const int numFrames = 5;
-
 
 // ========================================================
 // CORE 1: NETWORKING & MCP23017 ANIMATION MACHINE
@@ -133,11 +134,13 @@ void publish_state_msg(NodeStateMsg msg) {
   client.publish(topic_curr_r, msg.state_right, true);
   client.publish(topic_curr_a, msg.state_alwy, true);
 
+  /*
   if (msg.batt_pct != -1) {
     char bStr[8];
     snprintf(bStr, sizeof(bStr), "%d", msg.batt_pct);
     client.publish(topic_batt, bStr, true);
   }
+  */
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -156,6 +159,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.printf("Command Updated: %d\n", currentCommand);
 }
 
+// Helper to mathematically count how many MOSFETs are active in the raw bitmask
+int countActiveStrips(uint8_t portMask) {
+  int count = 0;
+  while (portMask) { count += portMask & 1; portMask >>= 1; }
+  return count;
+}
+
 void runAnimationStateMachine() {
   static unsigned long previousMillis = 0;
   static int currentFrame = 0;      
@@ -172,28 +182,33 @@ void runAnimationStateMachine() {
         case 0: 
           mcp.writeGPIOA(0x00); mcp.writeGPIOB(0x00); 
           expectLeftOn=false; expectRightOn=false; 
+          // totalActiveStrips = 0;
           break;
         case 1: 
           mcp.writeGPIOA(chaseFrames[currentFrame]); mcp.writeGPIOB(0x00); 
           expectLeftOn=true; expectRightOn=false; 
           dynamicThreshLeft = THRESH_PER_STRIP * 2.5; // Expecting ~3 strips to be ON
+          // totalActiveStrips = 3;
           break;
         case 2: 
           mcp.writeGPIOA(0x00); mcp.writeGPIOB(chaseFrames[currentFrame]); 
           expectLeftOn=false; expectRightOn=true; 
           dynamicThreshRight = THRESH_PER_STRIP * 2.5; // Expecting ~3 strips to be ON
+          // totalActiveStrips = 3;
           break;
         case 3: 
           mcp.writeGPIOA(chaseFrames[currentFrame]); mcp.writeGPIOB(chaseFrames[currentFrame]); 
           expectLeftOn=true; expectRightOn=true; 
           dynamicThreshLeft = THRESH_PER_STRIP * 2.5; 
           dynamicThreshRight = THRESH_PER_STRIP * 2.5;
+          // totalActiveStrips = 6;
           break;
         case 4: 
           mcp.writeGPIOA(0x1F); mcp.writeGPIOB(0x1F); 
           expectLeftOn=true; expectRightOn=true; 
           dynamicThreshLeft = THRESH_PER_STRIP * 4.5; // Solid ON expects all 5 strips
           dynamicThreshRight = THRESH_PER_STRIP * 4.5; 
+          // totalActiveStrips = 10;
           break; 
       }
       currentFrame = (currentFrame + 1) % numFrames;
@@ -216,15 +231,18 @@ void runAnimationStateMachine() {
       expectLeftOn = (portA > 0);
       expectRightOn = (portB > 0);
 
-      // NEW: Calculate exact dynamic thresholds based on how many bits are 1
+      // Calculate exact dynamic thresholds based on how many bits are 1
       int activeLeft = countActiveStrips(portA);
       int activeRight = countActiveStrips(portB);
       
+      // totalActiveStrips = activeLeft + activeRight;
+
       if (activeLeft > 0) dynamicThreshLeft = THRESH_PER_STRIP * (activeLeft - 0.5);
       if (activeRight > 0) dynamicThreshRight = THRESH_PER_STRIP * (activeRight - 0.5);
     }
   }
 }
+
 
 // ========================================================
 // CORE 0: HARDWARE DSP & 4-STATE DISCREPANCY LOGIC
@@ -246,13 +264,12 @@ const char* getDiscrepancyState(bool expectedOn, float actualCurrent, float thre
   if (expectedOn && actualCurrent >= threshold) return "ON";
   if (!expectedOn && actualCurrent < threshold) return "OFF";
   if (expectedOn && actualCurrent < threshold) return "FAIL_OPEN";
-  // if (!expectedOn && actualCurrent >= threshold)
   return "FAIL_SHORT"; 
 }
 
 void SensorTask(void * parameter) {
   esp_task_wdt_add(NULL); 
-  NodeStateMsg currentState = {true, -1, "---", "---", "---"};
+  NodeStateMsg currentState = {true, "---", "---", "---"};
   
   float filt_l = 0.0, filt_r = 0.0, filt_a = 0.0;
   unsigned long lastReadTime = 0;
@@ -293,8 +310,23 @@ void SensorTask(void * parameter) {
         changed = true;
       }
 
-      // (Battery Logic would go here - simplified for snippet)
-      // currentState.batt_pct = 100; 
+      /* --- DYNAMIC BATTERY SAG COMPENSATION (TEMPORARILY DISABLED) ---
+      float pinVoltage = (getMedianADC(PIN_VOLT_BATT) / 4095.0) * ADC_REF;
+      float rawBattVoltage = pinVoltage * ((BATT_R1 + BATT_R2) / BATT_R2) * K_CALIBRATION;
+      
+      // Add compensation: total active I2C strips + 1 for the Always ON strip
+      float compBattVoltage = rawBattVoltage + ((totalActiveStrips + 1) * SAG_PER_STRIP);
+      
+      int pct = 0;
+      if (compBattVoltage >= 12.1) pct = 100;
+      else if (compBattVoltage >= 11.5) pct = 50;
+      else pct = 0;
+
+      if (currentState.batt_pct != pct) {
+        currentState.batt_pct = pct;
+        changed = true;
+      }
+      */
 
       if (changed) xQueueOverwrite(sensorQueue, &currentState); 
     }
@@ -324,24 +356,26 @@ void setup() {
   pinMode(PIN_CURR_LEFT, INPUT); pinMode(PIN_CURR_RGHT, INPUT); pinMode(PIN_CURR_ALWY, INPUT);
   analogReadResolution(12); analogSetAttenuation(ADC_11db);
 
-  // Networking
+  // Networking Topic Generation
   sprintf(topic_cmd, "metro/signage/register/%d/value", ASSIGNED_REGISTER);
   sprintf(topic_status, "metro/signage/register/%d/status", ASSIGNED_REGISTER);
   sprintf(topic_power, "metro/signage/register/%d/power", ASSIGNED_REGISTER);
   sprintf(topic_curr_l, "metro/signage/register/%d/current1", ASSIGNED_REGISTER);
   sprintf(topic_curr_r, "metro/signage/register/%d/current2", ASSIGNED_REGISTER);
   sprintf(topic_curr_a, "metro/signage/register/%d/current3", ASSIGNED_REGISTER); // The 3rd load
-  sprintf(topic_batt, "metro/signage/register/%d/battery_pct", ASSIGNED_REGISTER); 
+  // sprintf(topic_batt, "metro/signage/register/%d/battery_pct", ASSIGNED_REGISTER); 
 
+  // Initialize Ethernet
   WiFi.onEvent(eth_event_handler);
   ETH.begin(ETH_PHY_TYPE, ETH_PHY_ADDR, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_POWER, ETH_CLK_MODE);
   ETH.config(local_IP, gateway, subnet, primaryDNS);
   client.setServer(mqtt_server_ip, mqtt_port);
   client.setCallback(callback);
 
+  // Create the Mailbox for IPC
   sensorQueue = xQueueCreate(1, sizeof(NodeStateMsg));
   
-  // WDT Config
+  // Initialize Watchdog Timer
   esp_task_wdt_config_t wdt_config = { .timeout_ms = 15000, .idle_core_mask = (1<<portNUM_PROCESSORS)-1, .trigger_panic = true };
   esp_task_wdt_init(&wdt_config);
   esp_task_wdt_add(NULL); 
@@ -359,6 +393,8 @@ void loop() {
       if (millis() - lastReconnect > 5000) {
         lastReconnect = millis();
         char clientId[30]; snprintf(clientId, sizeof(clientId), "ESP32-%s", ETH.macAddress().c_str());
+        
+        // Connect with Last Will and Testament
         if (client.connect(clientId, topic_status, 1, true, "OFFLINE")) {
           client.subscribe(topic_cmd, 1);
           client.subscribe(topic_scan, 0);
@@ -369,6 +405,7 @@ void loop() {
       client.loop(); 
       runAnimationStateMachine(); // Core 1 cleanly executes the LED sequence
       
+      // Check the mailbox for new sensor updates from Core 0
       NodeStateMsg tempMsg;
       if (xQueueReceive(sensorQueue, &tempMsg, 0) == pdTRUE) {
         networkState = tempMsg;
