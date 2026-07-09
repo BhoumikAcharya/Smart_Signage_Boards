@@ -39,9 +39,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 0.0,
-          "height": 1.5,
-          "width": 1.5
+          "drill": 0.8,
+          "height": 1.27,
+          "width": 2.54
         },
         "silk_line_width": 0.1,
         "silk_text_italic": false,
@@ -50,23 +50,7 @@
         "silk_text_thickness": 0.1,
         "silk_text_upright": false,
         "zones": {
-          "border_display_style": 2,
-          "border_hatch_pitch": 0.5,
-          "corner_radius": 0.0,
-          "corner_smoothing": 0,
-          "fill_mode": 0,
-          "hatch_gap": 1.5,
-          "hatch_orientation": 0.0,
-          "hatch_smoothing_level": 0,
-          "hatch_smoothing_value": 0.1,
-          "hatch_thickness": 1.0,
-          "min_clearance": 0.5,
-          "min_island_area": 10.0,
-          "min_thickness": 0.25,
-          "pad_connection": 1,
-          "remove_islands": 0,
-          "thermal_relief_gap": 0.5,
-          "thermal_relief_spoke_width": 0.5
+          "min_clearance": 0.5
         }
       },
       "diff_pair_dimensions": [],
@@ -449,7 +433,6 @@
       "footprint_filter": "ignore",
       "footprint_link_issues": "warning",
       "four_way_junction": "ignore",
-      "global_label_dangling": "warning",
       "ground_pin_not_ground": "warning",
       "hier_label_mismatch": "error",
       "isolated_pin_label": "warning",
@@ -489,7 +472,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "PCB_V3_JTAG.kicad_pro",
+    "filename": "PCB_V3_Final.kicad_pro",
     "version": 3
   },
   "net_settings": {
@@ -523,14 +506,10 @@
   },
   "pcbnew": {
     "last_paths": {
-      "gencad": "",
       "idf": "",
       "netlist": "",
       "plot": "",
-      "pos_files": "",
       "specctra_dsn": "",
-      "step": "",
-      "svg": "",
       "vrml": ""
     },
     "page_layout_descr_file": ""
@@ -641,33 +620,25 @@
     "meta": {
       "version": 1
     },
-    "net_format_name": "",
     "page_layout_descr_file": "",
     "plot_directory": "",
     "reuse_designators": true,
-    "space_save_all_events": true,
-    "spice_current_sheet_as_root": false,
-    "spice_external_command": "spice \"%I\"",
-    "spice_model_current_sheet_as_root": true,
-    "spice_save_all_currents": false,
-    "spice_save_all_dissipations": false,
-    "spice_save_all_voltages": false,
     "subpart_first_id": 65,
     "subpart_id_separator": 0,
     "top_level_sheets": [
       {
-        "filename": "PCB_V3_JTAG.kicad_sch",
-        "name": "PCB_V3_JTAG",
-        "uuid": "ee241afc-090c-4762-b5af-0318d3704def"
+        "filename": "PCB_V3_Final.kicad_sch",
+        "name": "Root",
+        "uuid": "0c69079a-135b-4a04-ac39-3a0385135bba"
       }
     ],
-    "used_designators": "",
+    "used_designators": "#PWR49,C1,F1",
     "variants": []
   },
   "sheets": [
     [
-      "ee241afc-090c-4762-b5af-0318d3704def",
-      "PCB_V3_JTAG"
+      "0c69079a-135b-4a04-ac39-3a0385135bba",
+      "Root"
     ]
   ],
   "text_variables": {},
