@@ -1,0 +1,4 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "5v_relay_module-cache") (type "Legacy") (uri "/Users/yash/Documents/GitHub/smart-signage-boards/PCB/Open Source Files/Relay/5v_relay_module-master/5v_relay_module-cache.lib") (options "") (descr "Legacy project cache library"))
+)
