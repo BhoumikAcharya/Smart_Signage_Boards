@@ -70,7 +70,104 @@
         }
       },
       "diff_pair_dimensions": [],
-      "drc_exclusions": [],
+      "drc_exclusions": [
+        [
+          "courtyards_overlap|115345000|141735000|9173df03-711a-4061-9cd6-86b7d83ead65|9633a807-b3e1-43f4-8409-8c808f36ce9e",
+          ""
+        ],
+        [
+          "courtyards_overlap|154444285|62975001|f6e78996-b1c6-4c21-9d2d-c5c53206cc9f|ffcae589-e58b-46c4-ad95-b61ceef06815",
+          ""
+        ],
+        [
+          "courtyards_overlap|165190000|99475000|0c5121e5-5fbc-4715-b714-0ab9e9f7b350|7ab6aa02-47ef-402d-936e-0972d28ff9b7",
+          ""
+        ],
+        [
+          "courtyards_overlap|90845000|141735000|7842465c-8f77-4768-bf17-ede037d8b643|eb86e9c4-65e1-497e-bed4-13db068ffcf2",
+          ""
+        ],
+        [
+          "silk_overlap|102090000|142170000|2f3d285e-174b-4657-97ba-9b7e89504a7b|82afecee-7eed-4449-9c82-1ec3b5507720",
+          ""
+        ],
+        [
+          "silk_overlap|102090000|142240000|2f3d285e-174b-4657-97ba-9b7e89504a7b|fbf86cbf-6513-4102-a49c-f997bea70e33",
+          ""
+        ],
+        [
+          "silk_overlap|102090000|142310000|69d6099d-49c5-4a9c-9ef5-c2084920df17|fbf86cbf-6513-4102-a49c-f997bea70e33",
+          ""
+        ],
+        [
+          "silk_overlap|112310000|142170000|1a1ef842-b60d-4728-9b97-82fd36ca5ef2|82afecee-7eed-4449-9c82-1ec3b5507720",
+          ""
+        ],
+        [
+          "silk_overlap|112310000|142240000|1a1ef842-b60d-4728-9b97-82fd36ca5ef2|70a84090-edad-4665-92fb-0be4f89fe8d9",
+          ""
+        ],
+        [
+          "silk_overlap|112310000|142310000|69d6099d-49c5-4a9c-9ef5-c2084920df17|70a84090-edad-4665-92fb-0be4f89fe8d9",
+          ""
+        ],
+        [
+          "silk_overlap|154384285|66010001|a0649040-9c96-40a8-a71d-13894b6550ac|a0ed3e4b-ab1c-4ffe-b4ee-4f7ff4638f07",
+          ""
+        ],
+        [
+          "silk_overlap|154384285|88930001|a0649040-9c96-40a8-a71d-13894b6550ac|fe0bf741-6328-4f40-8dc9-20ba2cb672c1",
+          ""
+        ],
+        [
+          "silk_overlap|154444285|66010001|a0ed3e4b-ab1c-4ffe-b4ee-4f7ff4638f07|b9410251-485e-4270-9e2f-b2d367dc0476",
+          ""
+        ],
+        [
+          "silk_overlap|154444285|88930001|c4b869e6-bbbe-412e-b012-49edb80620e3|fe0bf741-6328-4f40-8dc9-20ba2cb672c1",
+          ""
+        ],
+        [
+          "silk_overlap|154504285|66010001|3beb988d-5042-496b-935a-2a63d57cb558|b9410251-485e-4270-9e2f-b2d367dc0476",
+          ""
+        ],
+        [
+          "silk_overlap|154504285|88930001|3beb988d-5042-496b-935a-2a63d57cb558|c4b869e6-bbbe-412e-b012-49edb80620e3",
+          ""
+        ],
+        [
+          "silk_overlap|165130000|115210000|11c08eca-b305-42fe-8feb-9ce9e4c46a96|cfe114c2-d72d-4712-890c-27fe7d61e351",
+          ""
+        ],
+        [
+          "silk_overlap|165130000|99910000|cfe114c2-d72d-4712-890c-27fe7d61e351|d62ddea4-3775-4338-9ead-488d79a76d50",
+          ""
+        ],
+        [
+          "silk_overlap|165190000|115210000|11c08eca-b305-42fe-8feb-9ce9e4c46a96|4a971598-d0ec-4065-8735-0b8ffe613402",
+          ""
+        ],
+        [
+          "silk_overlap|165190000|99910000|4aa553e8-b392-4d32-aecc-a08f1b6c5c16|d62ddea4-3775-4338-9ead-488d79a76d50",
+          ""
+        ],
+        [
+          "silk_overlap|165250000|115210000|4a971598-d0ec-4065-8735-0b8ffe613402|c27509f3-39e4-489c-a611-a471a4a9b7d1",
+          ""
+        ],
+        [
+          "silk_overlap|165250000|99910000|4aa553e8-b392-4d32-aecc-a08f1b6c5c16|c27509f3-39e4-489c-a611-a471a4a9b7d1",
+          ""
+        ],
+        [
+          "silk_overlap|80190000|142170000|116b6cab-38d4-4d67-acf6-b433a1aef791|65fcd42a-ab7d-4516-9d8f-58d0cd0dd87d",
+          ""
+        ],
+        [
+          "silk_overlap|87850000|142290000|9f6aeaa2-8dee-411b-bc2b-3ce9fcf91a81|a42667eb-1db9-4561-b8a0-1bb62a4ed277",
+          ""
+        ]
+      ],
       "meta": {
         "version": 2
       },
@@ -525,7 +622,7 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "",
+      "plot": "Gerber Files/",
       "pos_files": "",
       "specctra_dsn": "",
       "step": "",
@@ -652,7 +749,7 @@
         "uuid": "0c69079a-135b-4a04-ac39-3a0385135bba"
       }
     ],
-    "used_designators": "H1-4",
+    "used_designators": "#PWR50-53,D1-2,H1-4",
     "variants": []
   },
   "sheets": [
