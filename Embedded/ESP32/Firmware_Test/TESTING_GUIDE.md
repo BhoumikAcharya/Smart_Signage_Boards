@@ -53,7 +53,10 @@ Open the Serial Monitor at **115200 baud**. The menu prints on boot (press `h` t
 | `5`–`9` | Toggle one **RHS** MOSFET (Port B0–B4) |
 | `a` | Turn **all** MOSFETs ON |
 | `x` | Turn **all** MOSFETs OFF |
-| `c` | Run the **chase** animation self-test (5 cycles), then restore previous state |
+| `c` | Run the **chase** animation on **both** sides (5 cycles), then restore previous state |
+| `L` | Run the **LEFT-side** chase for **10 s** (uppercase), then restore previous state — press any key to stop early |
+| `R` | Run the **RIGHT-side** chase for **10 s** (uppercase), then restore previous state — press any key to stop early |
+| `D` | Run the **DEMO loop**: LEFT 10 s → RIGHT 10 s → all OFF 3 s, repeating until any key is pressed |
 | `r` | Read **all 4 current sensors** once |
 | `s` | Toggle **continuous 1 Hz current stream** on/off |
 | `v` | Read **PSU + Battery** divider voltages once |
@@ -90,7 +93,16 @@ Do these **in order**. Do not proceed past a failing step — fix it first.
 5. **Record any channel that does not light** (dead MOSFET, wiring, or solder). A strip lighting on
    the *wrong* key = swapped gate wiring.
 6. Press `a` (all on) then `x` (all off) to confirm bulk control.
-7. Press `c` to watch the chase animation sweep across both sides smoothly.
+7. Press `c` to watch the chase animation sweep across **both** sides smoothly.
+8. Press `L` (uppercase) — only the **LHS** strips should chase for ~10 s while the RHS stays put;
+   then `R` (uppercase) — only the **RHS** strips should chase for ~10 s. Press any key to cut a run
+   short. This confirms the two sides are independently addressable.
+9. Press `D` (uppercase) to run the **demo loop** (LEFT 10 s → RIGHT 10 s → all OFF 3 s, repeating).
+   Confirm the sides alternate cleanly with a dark gap between, then press any key to stop.
+
+> **Note — uppercase keys:** `L`, `R`, and `D` are **uppercase** so `R` (right chase) does not clash
+> with lowercase `r` (read sensors). While a 10 s chase or the demo is running the sketch is
+> **blocked** — other commands won't process until it finishes or you press a key to abort.
 
 ### Step 3 — Current sensors (correlate with MOSFETs)
 1. Press `x` (all off), then `r`. All four currents should read **≈ 0 A** for the switched loads.
@@ -141,6 +153,7 @@ The board passes hardware bring-up when:
 
 - [ ] MCP23017 detected `OK` on SDA=4 / SCL=13.
 - [ ] All 10 MOSFET channels switch their correct strip individually (`0`–`9`), plus `a`/`x`/`c`.
+- [ ] `L` and `R` each animate **only their own side** for ~10 s; `D` alternates the sides cleanly.
 - [ ] Switched-load currents track their MOSFETs (LHS/RHS rise when on, ~0 when off).
 - [ ] Static1 + Static2 show steady non-zero current.
 - [ ] PSU + Battery dividers read plausible, stable, non-railing values.

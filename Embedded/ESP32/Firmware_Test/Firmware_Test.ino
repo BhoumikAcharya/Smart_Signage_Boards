@@ -92,7 +92,10 @@ void printMenu() {
   Serial.println(F("Patterns:"));
   Serial.println(F("  a -> ALL MOSFETs ON"));
   Serial.println(F("  x -> ALL MOSFETs OFF"));
-  Serial.println(F("  c -> run CHASE animation (5 cycles)"));
+  Serial.println(F("  c -> run CHASE on BOTH sides (5 cycles)"));
+  Serial.println(F("  L -> LEFT-side chase for 10 seconds (uppercase)"));
+  Serial.println(F("  R -> RIGHT-side chase for 10 seconds (uppercase)"));
+  Serial.println(F("  D -> DEMO loop: LEFT 10s -> RIGHT 10s -> OFF 3s (repeats)"));
   Serial.println(F("Sensors:"));
   Serial.println(F("  r -> read all sensors ONCE"));
   Serial.println(F("  s -> toggle continuous sensor STREAM (1 Hz)"));
@@ -125,6 +128,69 @@ void runChase() {
   }
   pushPorts(); // restore prior state
   Serial.println(F(">> Chase done, state restored."));
+}
+
+// Blocking wait that aborts early the moment a Serial byte arrives.
+// Returns true if interrupted (a byte is waiting), false if the full time elapsed.
+bool delayOrAbort(unsigned long ms) {
+  unsigned long start = millis();
+  while (millis() - start < ms) {
+    if (Serial.available() > 0) return true;
+    delay(1);
+  }
+  return false;
+}
+
+// Animate the chase on ONE side for durationMs. left=true -> Port A (LHS),
+// left=false -> Port B (RHS). Does NOT touch the other side. Returns true if
+// aborted early by Serial input.
+bool chaseSide(bool left, unsigned long durationMs) {
+  unsigned long start = millis();
+  int f = 0;
+  while (millis() - start < durationMs) {
+    if (left) mcp.writeGPIOA(chaseFrames[f]);
+    else      mcp.writeGPIOB(chaseFrames[f]);
+    f = (f + 1) % 5;
+    if (delayOrAbort(120)) return true;
+  }
+  return false;
+}
+
+// One-shot single-side chase for the 'L' / 'R' menu keys: runs 10 s (or until a
+// key is pressed), then restores the prior manual state on both sides.
+void runChaseSide(bool left) {
+  Serial.printf(">> %s chase (10s)... press any key to stop early\n", left ? "LEFT" : "RIGHT");
+  while (Serial.available() > 0) Serial.read(); // flush the command's trailing newline
+  chaseSide(left, 10000);
+  while (Serial.available() > 0) Serial.read(); // consume an early-stop key if any
+  pushPorts();                                  // restore prior manual state
+  Serial.printf(">> %s chase done, state restored.\n", left ? "LEFT" : "RIGHT");
+}
+
+// Continuous DEMO: LEFT 10s -> RIGHT 10s -> ALL OFF 3s, repeating until any key
+// is pressed. Only the active side animates during each phase.
+void runDemo() {
+  Serial.println(F(">> DEMO started: LEFT 10s -> RIGHT 10s -> OFF 3s (repeats)."));
+  Serial.println(F("   Press any key to stop."));
+  while (Serial.available() > 0) Serial.read(); // flush the command's trailing newline
+
+  while (true) {
+    Serial.println(F("   [DEMO] LEFT chase (10s)"));
+    mcp.writeGPIOB(0x00);                 // hold RHS off
+    if (chaseSide(true, 10000)) break;
+
+    Serial.println(F("   [DEMO] RIGHT chase (10s)"));
+    mcp.writeGPIOA(0x00);                 // hold LHS off
+    if (chaseSide(false, 10000)) break;
+
+    Serial.println(F("   [DEMO] ALL OFF (3s)"));
+    mcp.writeGPIOA(0x00); mcp.writeGPIOB(0x00);
+    if (delayOrAbort(3000)) break;
+  }
+
+  while (Serial.available() > 0) Serial.read(); // consume the stop key
+  pushPorts();                                  // restore prior manual state
+  Serial.println(F(">> DEMO stopped, state restored."));
 }
 
 void readSensors() {
@@ -186,6 +252,9 @@ void loop() {
     else if (c == 'a')            { portA = 0x1F; portB = 0x1F; pushPorts(); Serial.println(F(">> ALL ON")); }
     else if (c == 'x')            { portA = 0x00; portB = 0x00; pushPorts(); Serial.println(F(">> ALL OFF")); }
     else if (c == 'c')             runChase();
+    else if (c == 'L')             runChaseSide(true);
+    else if (c == 'R')             runChaseSide(false);
+    else if (c == 'D')             runDemo();
     else if (c == 'r')             readSensors();
     else if (c == 'v')             readVoltages();
     else if (c == 's')            { telemetryStream = !telemetryStream;

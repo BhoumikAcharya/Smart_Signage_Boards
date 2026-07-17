@@ -197,11 +197,18 @@ production so calibration validates here.
 | `0`–`4` | Toggle an LHS MOSFET (Port A0–A4) |
 | `5`–`9` | Toggle an RHS MOSFET (Port B0–B4) |
 | `a` / `x` | All MOSFETs ON / OFF |
-| `c` | Run chase animation self-test (5 cycles) |
+| `c` | Run chase animation on **both** sides (5 cycles) |
+| `L` | LEFT-side chase for **10 s** (uppercase; RHS untouched) — press any key to stop early |
+| `R` | RIGHT-side chase for **10 s** (uppercase; LHS untouched) — press any key to stop early |
+| `D` | DEMO loop: LEFT 10 s → RIGHT 10 s → all OFF 3 s, repeating until any key is pressed |
 | `r` | Read all current sensors once |
 | `s` | Toggle continuous 1 Hz current stream |
 | `v` | Read PSU + battery divider voltages once |
 | `h` | Reprint the menu |
+
+> **Uppercase `L`/`R`/`D`:** the directional/demo animation keys are uppercase so `R` (right chase)
+> does not collide with lowercase `r` (read sensors). The 10 s chases and the demo loop are
+> **blocking** while they run and **abortable** — press any key to stop and restore the prior state.
 
 > **Calibration placeholders:** ACS712 `SENS/ZERO` and the voltage-divider ratios in the sketch are
 > starting values. Verify on the bench with a multimeter and update them before trusting readings.
