@@ -2,3 +2,7 @@
 /PCB/PCB_V3/PCB_V3_Final/.history
 /PCB/PCB_V3/PCB_V3_JTAG/.history
 /PCB/PCB_V3/Untitled/.history
+
+# Python
+__pycache__/
+*.py[cod]

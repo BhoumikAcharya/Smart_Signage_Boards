@@ -80,9 +80,9 @@ Node index `i` is 0-based (`i = 0` is node 1 / register 40001).
 | HMI Manual Buffer | `41001–41100` | `1000 + i` | HMI | Gateway (MUX) |
 | **SCADA Auto Buffer** | `42001–42100` | `2000 + i` | **PLC** | Gateway (MUX) |
 | MUX Control Flag | `43001` | `3000` | HMI / PLC | Gateway |
-| Diagnostic Block | `45001–45700` | `5000 + (i * 7)` | Gateway | PLC / HMI |
+| Diagnostic Block | `45001–45800` | `5000 + (i * 8)` | Gateway | PLC / HMI |
 
-`HR_SIZE = 6000` (indices 0–5999). Covers the diag block end at index 5699. Sequential block; the gaps are intentionally unused.
+`HR_SIZE = 6000` (indices 0–5999). Covers the diag block end at index 5799. Sequential block; the gaps are intentionally unused.
 
 Only `hr` (holding registers) is populated. `di`/`co`/`ir` are left `None`, so a PLC attempting to read coils or input registers gets a Modbus exception rather than a silent zero. This is deliberate — it fails loudly on a misconfigured PLC.
 
@@ -95,30 +95,49 @@ Only `hr` (holding registers) is populated. `di`/`co`/`ir` are left `None`, so a
 
 ### Command value encoding (40001/41001/42001 zones)
 
-Per-node relay state, 2 bits:
+> **CORRECTED 2026-07-20.** This section previously documented a 2-bit "Relay 1 / Relay 2" pair (`0`=both off, `1`=R1, `2`=R2, `3`=both). **That model is obsolete** — the hardware is 10 MOSFETs behind an MCP23017, not two relays. The gateway publishes the integer verbatim and never interpreted it, so `Pi.py` was always correct; only this table was wrong.
 
-| Value | Relay 1 (LHS) | Relay 2 (RHS) |
+**Commands drive the moving arrows ONLY.** Static Zones 1 and 2 are hardwired always-on — current-monitored, never switched. No command value affects them.
+
+| Value | Meaning | HMI access |
 | --- | --- | --- |
-| `0` | OFF | OFF |
-| `1` | ON | OFF |
-| `2` | OFF | ON |
-| `3` | ON | ON |
+| `0` | Arrows OFF | Operator |
+| `1` | LHS chase animation | Operator |
+| `2` | RHS chase animation | Operator |
+| `3` | Both chase animations | **PIN** |
+| `4` | Solid ON — left MOSFETs (Port A `0x1F`) | **PIN** |
+| `5` | Solid ON — right MOSFETs (Port B `0x1F`) | **PIN** |
+| `6` | Solid ON — everything (`0x1F`/`0x1F`) | **PIN** |
+| `10000`–`11023` | **Raw bitmask.** `value - 10000` = 10-bit MOSFET mask; low 5 bits = Port A (LHS), high 5 bits = Port B (RHS). | **PIN** |
 
-### Diagnostic Block layout — 7 registers per node
+Only `0`/`1`/`2` are normal signage operation. Everything from `3` up is a maintenance facility and sits behind a **technician PIN**, on a panel separate from operator mode control.
 
-Base index for node `i` = `5000 + (i * 7)`.
+**Technician modes LATCH** (decided 2026-07-20). There is no auto-revert timeout — a mode set by a technician holds until it is explicitly changed. This is consistent with the network-loss behaviour (hold last command, persisted to NVS), and means a sign left in a solid-ON lamp-test state stays that way until someone changes it. The HMI must therefore make the active mode unmistakable when it is not an operator mode.
+
+> **The PIN gates the HMI, not the protocol.** The gateway publishes the register value verbatim and the PLC writes the SCADA buffer (`42001+`) freely, so a technician mode originating from SCADA executes unchallenged. The PIN prevents local operator misuse; it is not a security boundary.
+
+### Diagnostic Block layout — 8 registers per node
+
+Base index for node `i` = `5000 + (i * 8)`.
 
 | Offset | Register (node 1) | Content | Encoding |
 | --- | --- | --- | --- |
 | +0 | 45001 | Network Status | `1` = Online, `0` = Offline |
-| +1 | 45002 | Main Power | `1` = OK, `0` = PSU Fail |
+| +1 | 45002 | Main Power | `1` = OK, `0` = PSU Fail — **gate on +0, see below** |
 | +2 | 45003 | LHS LED Health | 4-state (below) |
 | +3 | 45004 | RHS LED Health | 4-state |
-| +4 | 45005 | Battery Percentage | `0`–`100` |
+| +4 | 45005 | Battery Percentage | `0`–`100`, `65535` = unknown |
 | +5 | 45006 | **Static Zone 1** Health | 4-state |
 | +6 | 45007 | **Static Zone 2** Health | 4-state |
+| +7 | 45008 | **Actual Executing State** | mode the node reports running; `65535` = unknown |
 
-Node 1 → `45001–45007`. Node 2 → `45008–45014`. Node 100 → `45694–45700`.
+Node 1 → `45001–45008`. Node 2 → `45009–45016`. Node 100 → `45793–45800`.
+
+> **Register `+7` added 2026-07-20.** The `40001+` zones hold what a node was *commanded*; `+7` holds what it *reports executing*. A mismatch means the node is running something else — stale command, rejected payload, missed publish — and **nothing else in the system detects it**. Alarm on `commanded != actual` when the node is online and `+7 != 65535`.
+>
+> This renumbered the whole block (was 7/node, `45001–45700`). Any PLC program written against the old map must be updated.
+
+> **Power register `+1` has no unknown state.** An offline node reads `0`, identical to a real PSU failure. Because the battery backup exists so a node *survives PSU loss and stays online to report it*, `power=FAIL` from an ONLINE node is the critical alarm — and offline nodes raising the same alarm would bury it. **PLC must gate:** `IF +0 == 1 AND +1 == 0 THEN "PSU FAILURE"`. Decision on record (2026-07-20): keep the binary encoding, document the gating requirement. Same gating applies to the LED-health registers.
 
 **4-state discrepancy encoding:**
 
@@ -155,8 +174,9 @@ If firmware and gateway disagree on this, **nothing matches, every node reads OF
 | `current1` | 4-state string | LHS arrows (ACS712 on GPIO 34) |
 | `current2` | 4-state string | RHS arrows (ACS712 on GPIO 35) |
 | `current3` | 4-state string | **Static Zone 1** (ACS712 on GPIO 32) |
-| `current4` | 4-state string | **Static Zone 2** (ACS712 on GPIO 33) — **NEW** |
-| `battery_pct` | integer `0`–`100` | |
+| `current4` | 4-state string | **Static Zone 2** (ACS712 on GPIO 33) |
+| `battery_pct` | integer `0`–`100` | stubbed in firmware; omit rather than publish `0` |
+| `state` | integer | **NEW 2026-07-20.** The mode the node is ACTUALLY executing — not what it was told. Restores v1.1.1's "SCADA blind spot fix". Publish on every command change and on PING. |
 
 **Naming rationale:** wire-level metric names stay *sensor-indexed* (`current1`…`current4`) because `current1/2/3` are already deployed — `current4` is an addition, not a rename. `Static Zone 1 / 2` are the *display* labels used in the HMI and documentation only.
 
@@ -164,7 +184,7 @@ If firmware and gateway disagree on this, **nothing matches, every node reads OF
 
 | Topic | Payload | Retain | Notes |
 | --- | --- | --- | --- |
-| `metro/signage/register/<40001+i>/value` | integer `0`–`3` | **`retain=True`** | Node's target relay state |
+| `metro/signage/register/<40001+i>/value` | integer `0`–`6` or `10000`–`11023` | **`retain=True`** | Node's target arrow state (see §4 encoding) |
 | `metro/signage/scan` | `PING` | `retain=False` | Broadcast, every 60 s |
 
 `retain=True` on commands is **required**: it is what lets an ESP32 receive its target state immediately on boot/reconnect instead of coming up blank.
@@ -237,7 +257,9 @@ Three traps:
 
 ---
 
-## 8. Known Bugs in `Pi.py` v1.0.1 — fix before deployment
+## 8. Known Bugs in `Pi.py` v1.0.1 — ✅ ALL FIXED IN v2.0.0 (2026-07-20)
+
+> **Status: resolved.** Every item below was fixed in the `Pi.py` v2.0.0 rewrite. The section is retained as the rationale record — these are the failure modes to regression-test against, not an outstanding work list. Verified by an offline logic harness (diag-block indexing, `65535` sentinel, offline scrubbing of all four current channels, malformed-topic resilience).
 
 ### CRITICAL — the SCADA diagnostic block is never written under systemd
 
@@ -347,13 +369,13 @@ These are **conflicts between the shipped code and the project docs**. Left unre
 | # | Item | Doc(s) affected |
 | --- | --- | --- |
 | 1 | **Register `42001` (SCADA Auto Buffer) is entirely missing from `hmi-specification.md` §4.2.** This is the block the PLC actually writes to. It is documented in `Gateway_doc.md` and used in `Pi.py`, but absent from the project's source of truth. | `hmi-specification.md` |
-| 2 | **Diagnostic block is now 7 registers/node (`45001–45700`), not 6.** All docs still say 6 / `45001–45600`. | `hmi-specification.md`, `architecture-overview.md`, `Gateway_doc.md` |
+| 2 | **Diagnostic block is now 7 registers/node (`45001–45700`), not 6.** ✅ `Gateway_doc.md` updated 2026-07-20 and implemented in `Pi.py` v2.0.0. Still outstanding in the other two docs. | ~~`Gateway_doc.md`~~, `hmi-specification.md`, `architecture-overview.md` |
 | 3 | **HMI ingests only `current1`/`current2`.** It is blind to Static Zone 1 and 2. Node Detail telemetry needs two more rows. | `hmi-specification.md` §3.2, §4.1 |
 | 4 | **`pin-map.md` nomenclature:** Load 3 → **Static Zone 1**, Load 4 → **Static Zone 2**. | `pin-map.md` |
-| 5 | **The BROADCAST PING's documented purpose is stale.** `Gateway_doc.md`, `HMI_doc.md` ("5-minute hardware fail-safes") and `hmi-specification.md` §3.3 all claim the ping resets ESP32 fail-safe/dead-man timers. The firmware decision on record is that **animation holds last command on network loss, with no fail-safe timer.** Either the timer exists or it doesn't — three documents currently assert a mechanism that may not. **Resolve with the firmware chat.** | all three |
+| 5 | **RESOLVED 2026-07-20 — the timer does NOT exist.** Confirmed: a node **holds its last command** on network loss; the command is persisted to NVS and re-applied on boot. No forced-ON, no forced-OFF. The `esp_task_wdt` (15 s) is internal hang recovery only. The PING's real purpose is to make nodes re-publish telemetry. ✅ `Gateway_doc.md` corrected. Still wrong in `HMI_doc.md` and `hmi-specification.md` §3.3 — and in `HMI.py`'s ping panel text, which must be reworded during the HMI rework. | ~~`Gateway_doc.md`~~, `HMI_doc.md`, `hmi-specification.md` |
 | 6 | **Library versions are unpinned in the spec.** Must state `paho-mqtt 2.1.0`, `pymodbus 3.11.3`, `mosquitto 2.0.21`, and that the codebase targets paho `CallbackAPIVersion.VERSION2`. | `hmi-specification.md` §1 |
 | 7 | **The IPs in `architecture-overview.md` are prefixed "e.g."** — they are now committed values (`10.45.2.50`, `192.168.1.10`). Drop the hedge, or the PLC integrator is working from a suggestion rather than a spec. | `architecture-overview.md` §2 |
-| 8 | **Display is 7" (1024x600) in the spec, but a Waveshare 10.1" DSI LCD is being brought up.** Pagination/coordinate math is marked TBD for 10.1". | `hmi-specification.md` §1, §5 |
+| 8 | **RESOLVED 2026-07-20 — the Waveshare 10.1" DSI LCD (1280x800) is CONFIRMED** as the shipping panel. The 7"/1024x600 figure in the spec is superseded. `HMI.py`'s layout is built entirely from absolute `.place()` coordinates sized for 1024x600 and must be re-laid-out; pagination (`nodes_per_page = 8`) can grow with the extra vertical space. | `hmi-specification.md` §1, §5 |
 | 9 | **HMI-configurable SCADA IP** (discussed, not built). Would be the first HMI action reaching the **OS** rather than the gateway's register space — a genuinely new class of action, absent from the §4.3 action-mapping table. Requires a root-owned, zero-argument helper script behind a narrow sudoers rule; the HMI must never get blanket `sudo`. | `hmi-specification.md` §3.3, §4.3 |
 
 ---

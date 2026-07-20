@@ -1,0 +1,43 @@
+[Unit]
+Description=Metro Signage Gateway (Modbus TCP <-> MQTT bridge)
+Documentation=file:///home/pi/smart-signage-boards/Embedded/RaspberryPi/Gateway/Gateway_doc.md
+# Mosquitto's 192.168.1.10 listener cannot bind before eth0 has carrier and an
+# address, so the broker may briefly be absent. Want= (not Requires=) keeps the
+# gateway up if mosquitto restarts; paho reconnects on its own.
+After=network-online.target mosquitto.service
+Wants=network-online.target mosquitto.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/smart-signage-boards/Embedded/RaspberryPi/Gateway
+ExecStart=/home/pi/metro-gw/venv/bin/python3 Pi.py
+
+# Port 502 is privileged. Grant ONLY this capability rather than running as root.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+Restart=always
+RestartSec=5
+
+# Unbuffered so log lines reach the journal immediately, not at buffer flush.
+Environment=PYTHONUNBUFFERED=1
+
+# stdout is not a TTY here, so the dashboard suppresses itself automatically.
+# Diagnostic translation still runs. Logs go to stderr -> journal.
+StandardOutput=null
+StandardError=journal
+
+# --- Hardening. Remove any line that blocks a change you make later. ---
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/pi/smart-signage-boards/Embedded/RaspberryPi/Gateway
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+
+[Install]
+WantedBy=multi-user.target
