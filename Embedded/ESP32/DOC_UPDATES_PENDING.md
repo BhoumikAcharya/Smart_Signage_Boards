@@ -11,6 +11,12 @@ nothing is lost in between.
 **How to use:** work top to bottom after bench validation. Every entry gives the
 file, the line, what is currently wrong, and what it should say.
 
+> **Progress, 2026-07-27.** §1 (`Gateway_doc.md`) and §2 (`pi_agent.md`) are
+> **DONE** — none of them depended on bench measurements, only on reading the
+> shipped v3.0.0 firmware. §7 is **resolved**. Everything still open (§0, §3–§6)
+> is genuinely blocked on the 6-node bench round or belongs to the firmware/PCB
+> docs. See the per-section markers below.
+
 ---
 
 ## 0. BLOCKING — must be answered on the bench before docs can be written
@@ -30,7 +36,7 @@ them.
 
 ---
 
-## 1. `RaspberryPi/Gateway/Gateway_doc.md`
+## 1. `RaspberryPi/Gateway/Gateway_doc.md` — ✅ DONE 2026-07-27
 
 ### 1.1 — Line 126: meaning of `65535` on register `+7` — **HIGH**
 
@@ -82,26 +88,49 @@ Add. Four faults that were previously ambiguous now have distinct signatures:
 Rows 2 and 3 were previously indistinguishable and have completely different
 repair actions.
 
+### 1.4 — ✅ Done, and one item this checklist missed
+
+Also corrected while in the file:
+
+* **The NVS claim in §6 was wrong.** The PING correction block asserted the last
+  command "is persisted to NVS and re-applied on boot, so it survives a reboot
+  with the network still down." v3.0.0 defers NVS — the node boots to mode `0`
+  and waits for the retained `value`. A reboot during a network outage leaves
+  the sign **dark**. Amended in place; also raised as `pi_agent.md` §12 item 10.
+* Calibration is a **third** cause of `state` = `FAULT` (alongside MCP
+  unreachable and readback mismatch), and current telemetry is held at its last
+  value while calibrating. Added to the fault-signature table so a bench session
+  is not mistaken for a field fault.
+* "welded relay" → "shorted MOSFET" in the 4-state translation. The hardware has
+  no relays.
+
 ---
 
-## 2. `RaspberryPi/pi_agent.md`
+## 2. `RaspberryPi/pi_agent.md` — ✅ DONE 2026-07-27
 
-### 2.1 — Line 132 — **HIGH**
+### 2.1 — Line 132 — **HIGH** — ✅ done
 Same `65535` two-cause update as §1.1.
 
-### 2.2 — Line 136 — **CRITICAL**
-Same alarm-rule replacement as §1.2. Currently carries the identical wrong
-"and `+7 != 65535`" instruction.
+### 2.2 — Line 136 — **CRITICAL** — ✅ done
+Same alarm-rule replacement as §1.2. Carried the identical wrong
+"and `+7 != 65535`" instruction; replaced with the three-way branch, plus the
+fault-signature table.
 
-### 2.3 — §4 / §5 command encoding table — **HIGH**
-**Known stale.** Still documents the old 2-relay `0–3` model. Real encoding is
-`0–6` plus the `10000–11023` bitmask, arrows only. `Pi.py` passes the integer
-through untouched, so only the doc is wrong — but it is the doc an integrator
-would read first.
+### 2.3 — §4 / §5 command encoding table — ~~**HIGH**~~ — ❌ **this entry was wrong**
 
-### 2.4 — Line 372, item 2 — **LOW**
-Says the diag block is "now 7 registers/node (`45001–45700`)". It is **8**
-(`45001–45800`). Superseded by the 2026-07-20 change; the line was not updated.
+Checked against the file: §4 already carries the correct `0–6` + `10000–11023`
+arrows-only table, explicitly marked "CORRECTED 2026-07-20". The obsolete 2-relay
+`0–3` model is **not** present. This checklist entry was itself stale.
+
+What §5 *did* need, and got: `state` may carry the non-numeric payload `FAULT`;
+`battery_pct` is never published at all by v3.0.0; and the two divergence cases
+(rejected command → previous number, unverifiable outputs → `FAULT`) now have
+their own table.
+
+### 2.4 — Line 372, item 2 — **LOW** — ✅ done
+Corrected to **8** registers/node (`45001–45800`). While in §12: items 1/6/7/8
+marked resolved against `hmi_contract.md`, item 4 re-pointed at the real file,
+and items 10–12 added (NVS gap, `+7` two-cause alarm, missing SCADA doc).
 
 ---
 
@@ -201,20 +230,39 @@ there 2026-07-21).
 
 ## 5. New documents to create
 
-### 5.1 — SCADA operator / integrator doc — **CRITICAL, does not exist**
+### 5.1 — SCADA operator / integrator doc — ✅ **DONE 2026-07-27**
 
-The integrator currently has no single authoritative document. Must contain:
+Created: **`RaspberryPi/Gateway/SCADA_Integration_Guide.md`**. Self-contained —
+an integrator needs no other file. Everything on the original list is covered:
 
-* Full `40001+` and `45001+` register maps, 8 registers per node
-* The three-way `+7` alarm branch (§1.2)
-* The PSU gating rule: `IF +0 == 1 AND +1 == 0 THEN "PSU FAILURE"` — an offline
-  node otherwise reads as a PSU failure and buries the real battery-backed alarm
-* The general principle: gate every register interpretation on `+0` first
-* The fault signature table (§1.3)
-* **The 7 → 8 register renumbering.** Any PLC program written against the old
-  7-register map breaks. Node 1 `45001–45008`, node 2 `45009–45016`, node 100
-  `45793–45800`.
-* Battery reads `65535` (unknown), not `0` — it is stubbed, not flat
+* ✅ Full `40001+` and `45001+` register maps, 8 registers per node
+* ✅ The three-way `+7` alarm branch (§1.2)
+* ✅ The PSU gating rule, with the battery-backup rationale for why it matters
+* ✅ The general principle: gate every register interpretation on `+0` first
+* ✅ The fault signature table (§1.3), extended with recommended alarm priorities
+* ✅ The 7 → 8 register renumbering, plus a commissioning step that *detects* the
+  old layout (power node 2 alone; it must appear at `45009`, not `45008`)
+* ✅ Battery reads `65535`, not `0` — with an explicit "do not alarm" instruction
+
+Added beyond the original list, because an integrator would otherwise hit them
+in service:
+
+* **Cyclic command re-assertion is MANDATORY.** The Modbus datastore has no
+  persistence — a gateway restart zeroes `42001+` and publishes `0` to all 100
+  nodes, blanking every sign. A write-on-change PLC program passes every test and
+  then blacks out the installation on the first service restart. Raised as
+  `pi_agent.md` §12 item 13.
+* **MUX lockout is silent.** With `43001 == 1` the PLC's writes are accepted and
+  discarded with no error. The guide requires a local-control banner on the SCADA
+  screen.
+* **90 s offline-alarm inhibit after (re)connect** — startup cleanup marks all 100
+  nodes offline, and a node that misses the first PING stays that way for up to
+  60 s.
+* Modbus transaction limits: the 800-register diag block needs 7 reads of 120
+  (FC03 caps at 125); boundaries chosen so no node is split across two reads.
+* FC 01/02/04 return exceptions — a positive check that you are talking to the
+  right device.
+* Commissioning checklist, escalation table, and a one-screen quick reference.
 
 ### 5.2 — Bench commissioning checklist — **HIGH**
 
@@ -251,11 +299,18 @@ For the 6-node round:
 
 ---
 
-## 7. Referenced but missing
+## 7. Referenced but missing — ✅ RESOLVED 2026-07-27
 
-`pi_agent.md:372` cites `hmi-specification.md` and `architecture-overview.md` as
-needing updates. **Neither exists in this repository.** Either they live
-elsewhere, or the reference is stale. Resolve the reference or delete it.
+`pi_agent.md` §12 cited `hmi-specification.md`, `architecture-overview.md` and
+`pin-map.md`. **None of the three exists in this repository**, and `git log`
+shows they never did.
+
+Resolution: `hmi_contract.md` (2026-07-20) is the HMI source of truth and already
+carries what items 1, 6 and 8 asked for; §9 of `pi_agent.md` carries the
+committed IPs (item 7); the pin nomenclature belongs in
+`PCB/PCB_V3/Connections.md` (item 4). §12 has been re-pointed accordingly, with a
+note at the top of the section recording that the three cited documents do not
+exist — so the next reader does not go looking for them again.
 
 ---
 

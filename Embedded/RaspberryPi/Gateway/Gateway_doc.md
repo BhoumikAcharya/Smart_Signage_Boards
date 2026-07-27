@@ -1,8 +1,12 @@
 # Metro Signage IoT: Raspberry Pi Bridge
 
-**Version:** 2.0.0
+**Version:** 2.0.0 — documents `Pi.py` v2.0.0, paired with ESP32 `Firmware.ino` **v3.0.0**
+
+**Doc last reconciled against code:** 2026-07-27
 
 **Role:** Master Translation Gateway (Modbus TCP ↔ MQTT)
+
+> **Integrating a PLC/SCADA system? Read [`SCADA_Integration_Guide.md`](SCADA_Integration_Guide.md) instead.** It is the authoritative, self-contained integration document — addressing, encoding, alarm logic, timing and failure behaviour. This file is the *developer* view of the gateway and assumes you are working on the code.
 
 ## 📌 Overview
 
@@ -50,7 +54,7 @@ The ESP32 nodes send intelligent diagnostic strings instead of binary OK/FAIL st
 
 * `"FAIL_OPEN"` ➔ `2` (Intended ON, but 0 Amps flowing — e.g., burnt LED)
 
-* `"FAIL_SHORT"` ➔ `3` (Intended OFF, but current flowing — e.g., welded relay)
+* `"FAIL_SHORT"` ➔ `3` (Intended OFF, but current flowing — e.g., shorted MOSFET)
 
 ### 5. Ghost Message Purging & Retained States
 
@@ -60,7 +64,14 @@ On startup, the bridge executes `perform_startup_cleanup()`. It publishes `"OFFL
 
 The Main thread broadcasts a `"PING"` payload to the `metro/signage/scan` topic every 60 seconds. Each ESP32 responds by re-publishing its full telemetry set, which lets the gateway rebuild state without waiting for a value to change.
 
-> **Correction (2026-07-20):** earlier revisions of this document claimed the PING "resets the hardware fail-safe timers (Dead-Man Switch)". **No such timer exists.** The firmware decision on record is that a node **holds its last command** on network loss — the last command is persisted to NVS and re-applied on boot, so it survives a reboot with the network still down. There is no forced-ON and no forced-OFF fail-safe. The ESP32 watchdog (`esp_task_wdt`, 15 s) recovers an internal hang only; it is not a network fail-safe.
+> **Correction (2026-07-20):** earlier revisions of this document claimed the PING "resets the hardware fail-safe timers (Dead-Man Switch)". **No such timer exists.** The firmware decision on record is that a node **holds its last command** on network loss. There is no forced-ON and no forced-OFF fail-safe. The ESP32 watchdog (`esp_task_wdt`, 15 s) recovers an internal hang only; it is not a network fail-safe.
+>
+> **Amended (2026-07-27), firmware v3.0.0:** "hold last command" survives a *link* outage but **not a reboot**. NVS persistence is **deferred** — see `Firmware.ino` v3.0.0, which comes up at mode `0` and waits for the retained `value` topic to re-command it. So:
+>
+> * link drops, node stays powered → animation keeps running, command held (the animation state machine now runs unconditionally, outside the MQTT-connected branch).
+> * node reboots while the network is down → **the sign comes up dark and stays dark** until the broker is reachable and delivers the retained `value`.
+>
+> Acceptable on the bench. **Not acceptable for a site install** — NVS persistence is the outstanding gap that closes it.
 
 ### 7. Headless-Safe Diagnostics
 
@@ -106,7 +117,7 @@ The gateway publishes the register's integer **verbatim** — it does not interp
 
 > The old 2-bit "Relay 1 / Relay 2" encoding (`0-3` as an LHS/RHS relay pair) is **obsolete**, superseded by the modes above.
 
-**Technician modes latch.** No auto-revert timer — a mode holds until explicitly changed, consistent with the hold-last-command behaviour on network loss. A sign left in solid-ON stays lit until someone changes it.
+**Technician modes latch.** No auto-revert timer — a mode holds until explicitly changed, consistent with the hold-last-command behaviour on network loss. A sign left in solid-ON stays lit until someone changes it. **The latch does not survive a node reboot** — see the NVS caveat in §6.
 
 > **The PIN is an HMI-side control, not a protocol-level one.** The gateway publishes whatever integer is in the register, and the PLC writes freely to the SCADA buffer (`42001+`). A technician mode arriving from SCADA is executed without challenge. The PIN prevents *local operator* misuse; it is not a security boundary.
 
@@ -123,9 +134,9 @@ Each node occupies exactly **8** registers in the `45001+` diagnostic block. Nod
 | +4 | `45005` | Battery Percentage | `0`–`100`, or `65535` = unknown |
 | +5 | `45006` | **Static Zone 1** Health | 4-state |
 | +6 | `45007` | **Static Zone 2** Health | 4-state |
-| +7 | `45008` | **Actual Executing State** | the mode the node reports running (`0`–`6`, `10000+`), or `65535` = unknown |
+| +7 | `45008` | **Actual Executing State** | the mode the node reports running (`0`–`6`, `10000+`), or `65535` = unknown — **two causes, see below** |
 
-**Battery is currently stubbed in firmware.** The register slot is reserved and reads the `65535` sentinel. This is deliberate: `0` would be indistinguishable from a genuinely flat battery, so an offline or unfitted node must never report `0%` to SCADA.
+**Battery is currently stubbed in firmware.** The node deliberately does not publish `battery_pct` at all; the gateway maps the missing value to the `65535` sentinel. This is deliberate: `0` would be indistinguishable from a genuinely flat battery, so an offline or unfitted node must never report `0%` to SCADA.
 
 Unparseable or offline 4-state values map to `99`.
 
@@ -133,7 +144,44 @@ Unparseable or offline 4-state values map to `99`.
 
 Registers `40001+` hold what the node was **told** to do. Register `+7` holds what it **reports actually doing**. If they differ, the node is running something other than what the control system believes — a stale command, a rejected payload, or a missed publish.
 
-**A sign in this state displays the wrong thing while every screen says it is correct.** Nothing else in the system detects it. SCADA should alarm on `40001+i != 45008+(i*8)` whenever the node is online and register `+7` is not `65535`.
+**A sign in this state displays the wrong thing while every screen says it is correct.** Nothing else in the system detects it.
+
+#### `65535` on `+7` has two distinct causes — and they need different responses
+
+1. **The node is offline or has never reported.** The gateway has no value to translate. `+7` is stale; ignore it and treat the node as unreachable.
+2. **The node is ONLINE but cannot control or verify its outputs.** Firmware v3.0.0 publishes the non-numeric payload `FAULT` on the `state` topic when it cannot reach the MCP23017, when a MOSFET write fails readback verification, or while a bench calibration routine is running. The gateway maps any non-numeric payload to `65535`.
+
+Cause 2 is a **hardware fault requiring dispatch**. It is deliberately impossible to clear by commanding anything: `65535` never equals a valid command, so an operator cannot accidentally green the alarm by guessing the value that matches a stale number while the sign stays dark. It clears only when the hardware is fixed (or the technician exits calibration).
+
+> **The integrator must not "fix" this with a filter.** Suppressing `65535` suppresses the most serious fault in the system.
+
+#### Required alarm logic — three-way branch
+
+```
+IF   45001+(i*8) == 0
+     THEN "NODE OFFLINE"                                  // ignore +7, it is stale
+ELSE IF 45008+(i*8) == 65535
+     THEN "NODE CANNOT CONTROL OUTPUTS - hardware fault, dispatch"
+ELSE IF 45008+(i*8) != 40001+i
+     THEN "COMMAND NOT ACCEPTED - node running a different mode"
+```
+
+> **Superseded (2026-07-27).** This section previously instructed: *"alarm on `40001+i != 45008+(i*8)` whenever the node is online and register `+7` is not `65535`."* That was correct only while `65535` meant "offline / not yet reported". Since v3.0.0 it also means "online but cannot drive its outputs" — so the old rule **filters out the most serious fault in the system.** Use the three-way branch above.
+
+**Operating principle: check network status (`+0`) before trusting any other register in the block.** This is not a one-off for the PSU alarm below — it is the general rule for this memory map.
+
+### Fault signature table
+
+Four faults that were previously ambiguous now have distinct signatures. Rows 2 and 3 were indistinguishable before v3.0.0 and have completely different repair actions.
+
+| Fault | `+0` status | `+7` state | `current1/2` (`+2`/`+3`) | Action |
+| --- | --- | --- | --- | --- |
+| Board dead / cable out / PSU **and** battery gone | OFFLINE | stale | stale | Check power and link at the cabinet |
+| I2C / MCP23017 fault | **ONLINE** | `65535`, mismatch | `FAIL_OPEN` | Dispatch — driver board / I2C wiring |
+| LED strip or MOSFET fault | **ONLINE** | matches commanded | `FAIL_OPEN` | Dispatch — strip, wiring or output stage |
+| PSU failed, running on battery | **ONLINE** | matches commanded | normal | Dispatch — mains / PSU. Node is on borrowed time |
+
+A node in calibration also shows ONLINE + `65535`, with the four current registers **held at their last value** (the firmware suppresses current telemetry while calibrating, precisely so a bench session does not alarm a live control room). Expected during commissioning; unexpected on a live site.
 
 ### ⚠️ Power alarms MUST be gated on network status
 

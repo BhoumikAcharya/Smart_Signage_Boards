@@ -103,24 +103,78 @@ Treat `65535` / missing as "unknown", not as a mismatch — an offline node has 
 
 ---
 
-## 5. Bugs in the Current `HMI.py` — fix during the rework
+## 5. Bugs in the Current `HMI.py` — ✅ ALL FIXED 2026-07-27 (developer build)
 
-| # | Bug | Impact |
-| --- | --- | --- |
-| 1 | `mqtt.Client()` with no args | **Hard-fails on paho 2.x.** First positional is now `CallbackAPIVersion` |
-| 2 | `on_message` only, no `on_connect`/`on_disconnect` | Subscribe happens once at startup; a broker reconnect silently loses all subscriptions |
-| 3 | Subscribe called before `loop_start()` | Fragile ordering — subscribe from `on_connect` instead |
-| 4 | Compares current state to `"OK"` | Every current row shows an error colour permanently |
-| 5 | No `current3` / `current4` ingest | Blind to both static zones |
-| 6 | 2-relay model (`RELAY 1/2`, cmd 0–3) | Entire control panel is obsolete |
-| 7 | `self.mux_manual` is local instance state, never read back from `43001` | HMI and gateway **silently disagree** after a gateway restart or a PLC-side MUX change. Poll 43001 in the sync loop |
-| 8 | `read_holding_registers(reg, 1)` positional count | **Verify against pymodbus 3.11.3** — signature is `(address, count=..., device_id=...)`. Positional may break |
-| 9 | Modbus client never reconnects on failure | One dropped socket and the panel is dead until restart |
-| 10 | `except Exception: pass` in `on_message` and `refresh_data` | Silent failure everywhere; log instead |
-| 11 | Ping panel says "reset 5-minute fail-safe timers" | **No such mechanism exists.** Reword: it makes nodes re-publish telemetry |
-| 12 | `NODE_DATA[idx]["ip"] = payload.split(":")[1]` | Fine for IPv4; use `split(":", 1)` for consistency with the gateway |
-| 13 | Battery gauge wired to a live value | Battery is stubbed — see §6 |
-| 14 | `.place()` coordinates throughout | Sized for 1024x600, panel is 1280x800 |
+> **Status:** all 14 corrected in the in-place fix round. **Not yet executed against
+> hardware or the live gateway** — see §5.1 for the test plan that closes that gap.
+> The section is retained as the regression list.
+
+| # | Bug | Impact | Fix |
+| --- | --- | --- | --- |
+| 1 | `mqtt.Client()` with no args | **Hard-fails on paho 2.x.** First positional is now `CallbackAPIVersion` | ✅ `mqtt.Client(CallbackAPIVersion.VERSION2, client_id="MetroHMI")` |
+| 2 | `on_message` only, no `on_connect`/`on_disconnect` | Subscribe happens once at startup; a broker reconnect silently loses all subscriptions | ✅ Both handlers added, VERSION2 5-arg signatures |
+| 3 | Subscribe called before `loop_start()` | Fragile ordering — subscribe from `on_connect` instead | ✅ Subscribe moved into `on_connect`; `connect_async` + `loop_start` so the panel starts before mosquitto is up |
+| 4 | Compares current state to `"OK"` | Every current row shows an error colour permanently | ✅ `four_state_color()` — `OFF` is dim/healthy, only `FAIL_*` is red |
+| 5 | No `current3` / `current4` ingest | Blind to both static zones | ✅ Ingested + two new Node Detail rows |
+| 6 | 2-relay model (`RELAY 1/2`, cmd 0–3) | Entire control panel is obsolete | ✅ Replaced with 7 mode buttons, `0`–`6` |
+| 7 | `self.mux_manual` is local instance state, never read back from `43001` | HMI and gateway **silently disagree** after a gateway restart or a PLC-side MUX change | ✅ `43001` polled every 500 ms; register is the source of truth |
+| 8 | `read_holding_registers(reg, 1)` positional count | Signature is `(address, count=..., device_id=...)` | ✅ Confirmed against `bench/scada_probe.py` — **`count` must be a keyword.** All access centralised in `mb_read`/`mb_write` |
+| 9 | Modbus client never reconnects on failure | One dropped socket and the panel is dead until restart | ✅ `mb_ready()` reconnects before every access |
+| 10 | `except Exception: pass` | Silent failure everywhere | ✅ `logging` to stderr throughout |
+| 11 | Ping panel says "reset 5-minute fail-safe timers" | **No such mechanism exists** | ✅ Reworded to "telemetry refresh, not a fail-safe" |
+| 12 | `payload.split(":")[1]` | Use `split(":", 1)` for consistency with the gateway | ✅ |
+| 13 | Battery gauge wired to a live value | Battery is stubbed | ✅ Permanently greyed `N/A` / `NOT FITTED` |
+| 14 | `.place()` coordinates throughout | Sized for 1024x600, panel is 1280x800 | ✅ Window `1280x800`; dashboard columns converted to `relx`; `nodes_per_page` 8 → **11** |
+
+**Added beyond the bug list:**
+
+* **Commanded vs actual panel** in Node Detail (§4). Shows both values side by side,
+  flags `⚠ MISMATCH` when they diverge, and `⚠ HARDWARE FAULT` when the node
+  publishes the non-numeric `FAULT` payload. Unknown/offline is treated as unknown,
+  **not** as a mismatch.
+* **The MUX toggle is now labelled `CONTROL SOURCE · GLOBAL (43001)`.** It was
+  presented per-node while writing a single global register — one node's toggle
+  silently changed the control source for all 100. This is the minimum honest fix;
+  §8's design question about where it belongs is still open.
+* **Lockout warning reworded.** It told the operator to "engage local physical
+  switch to enable manual HMI control". **There is no physical switch** — the
+  on-screen toggle is the only control-source switch.
+
+### 5.1 — Test plan (not yet run)
+
+No Python toolchain was available on the authoring machine, so the file has **not
+been executed**. Run on the Pi before trusting it:
+
+```bash
+source ~/metro-gw/venv/bin/activate
+python3 -m py_compile RaspberryPi/HMI/HMI.py     # syntax
+python3 RaspberryPi/Gateway/bench/simulate_node.py --nodes 5 &
+python3 RaspberryPi/HMI/HMI.py
+```
+
+1. Panel opens at 1280x800, dashboard shows **11** rows per page.
+2. Nodes 1–5 go ONLINE with IPs. Open node 1 — all four current rows populate;
+   `OFF` renders dim, not red.
+3. Toggle control source to **HMI (MANUAL)**, press each mode `0`–`6`. The
+   simulator prints the received command; `ACTUALLY EXECUTING` follows it.
+   Technician modes `3`–`6` highlight **orange**, operator modes cyan.
+4. `scada_probe.py mux 0` from another shell → the toggle must flip to
+   SCADA (AUTO) **on its own within 500 ms** (bug 7 regression).
+5. `simulate_node.py --deaf 1` → node 1 reports a stale state; `⚠ MISMATCH` must
+   appear.
+6. `simulate_node.py --fault` → LHS cycles through `FAIL_OPEN` / `FAIL_SHORT`;
+   only those two render red.
+7. Restart the gateway while the HMI is open — the panel must recover on its own
+   (bugs 2, 9).
+
+### 5.2 — Deliberately NOT in this round
+
+* Technician **PIN** gate — modes 3–6 are unrestricted in this developer build.
+* Raw **bitmask** panel (`10000`–`11023`, 10 per-MOSFET toggles). The HMI
+  *displays* a bitmask value if one arrives, but cannot send one.
+* Dashboard fault/technician-mode **counters** (§7.1, §3).
+* The **visual redesign** — this round rescales the existing layout; it does not
+  rebuild it.
 
 ---
 
