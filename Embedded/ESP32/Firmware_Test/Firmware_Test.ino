@@ -123,7 +123,7 @@ void runChase() {
     for (int f = 0; f < 5; f++) {
       mcp.writeGPIOA(chaseFrames[f]);
       mcp.writeGPIOB(chaseFrames[f]);
-      delay(120);
+      delay(300);
     }
   }
   pushPorts(); // restore prior state
