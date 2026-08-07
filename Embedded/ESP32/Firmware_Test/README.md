@@ -87,8 +87,8 @@ expander, all ACS712, and all MOSFET sources.
 | 39 (VN) | Voltage divider | Battery (Vbatt → ≤3.0V) | — |
 | 34 | ACS712 #1 | **LHS** arrow load | Yes (Port A) |
 | 35 | ACS712 #2 | **RHS** arrow load | Yes (Port B) |
-| 32 | ACS712 #3 | **Static Load 1** | No (always-on) |
-| 33 | ACS712 #4 | **Static Load 2** | No (always-on) |
+| 32 | ACS712 #3 | **Static Zone 1** | No (always-on) |
+| 33 | ACS712 #4 | **Static Zone 2** | No (always-on) |
 
 ### 1.4 I2C Expander — MCP23017 @ `0x20`
 
@@ -172,9 +172,17 @@ Two **separate** mechanisms — do not conflate them:
 - **Watchdog** — ESP32 `esp_task_wdt`, **15s timeout, panic reset**, fed from both cores. Detects a
   frozen/deadlocked core and reboots the chip. It does **not** react to network loss.
 - **Failsafe (LOCKED) = HOLD LAST COMMAND.** On network loss the node keeps executing the last
-  command it received (no forced Solid-ON, no forced OFF). The last command is **persisted to NVS
-  (flash)** on change and reloaded+applied on boot, so the last state survives a reboot even if the
-  network is still down. If last state was `1`, it stays `1`.
+  command it received (no forced Solid-ON, no forced OFF). If the last state was `1`, it stays `1`.
+
+> **⚠️ Corrected 2026-08-07 — NVS persistence was never implemented.** This section previously
+> claimed the last command is *"persisted to NVS (flash) on change and reloaded+applied on boot, so
+> the last state survives a reboot even if the network is still down."* Firmware v3.0.0 contains no
+> `Preferences` and no `nvs_*` calls.
+>
+> **Hold-last-command survives a link outage but NOT a reboot.** A node boots to mode `0` and waits
+> for the retained `value` topic. Reboot during a network outage → **the sign comes up dark and
+> stays dark**. Bench-acceptable, not site-acceptable. NVS remains an open firmware gap —
+> `esp32_contract.md` §6, `pi_agent.md` §12 item 10.
 
 ### 2.6 Dual-Core Architecture (production firmware)
 
@@ -213,15 +221,22 @@ production so calibration validates here.
 > **Calibration placeholders:** ACS712 `SENS/ZERO` and the voltage-divider ratios in the sketch are
 > starting values. Verify on the bench with a multimeter and update them before trusting readings.
 >
-> **Not yet in the test sketch:** the 4th ACS712 (GPIO33 / Static 2). To be added alongside the
-> `current4` channel work.
+> ⚠️ **The test sketch's `SENS_*` defaults are `0.146`, which matches no standard ACS712 variant.**
+> Production v3.0.0 has moved to the real datasheet figures — `0.185` (5 A part) on the arrows and
+> `0.100` (20 A part) on the static zones. Until the sketch is brought in line, its current readings
+> and production's will disagree on identical hardware. See `esp32_contract.md` §1.
+>
+> ~~**Not yet in the test sketch:** the 4th ACS712 (GPIO33 / Static 2).~~ ✅ **Present as of
+> 2026-08-07** — `PIN_CURR_STA2 = 33` is declared and read alongside the other three. This note was
+> stale.
 
 ---
 
 ## 4. Decision Log
 
 ### Locked (implement in production firmware)
-1. **Failsafe = HOLD LAST COMMAND**, persisted to NVS (see §2.5). No forced ON/OFF.
+1. **Failsafe = HOLD LAST COMMAND** (see §2.5). No forced ON/OFF. ⚠️ The "persisted to NVS" half of
+   this decision is **not implemented** in v3.0.0 and is still open — see the correction in §2.5.
 2. **4th current channel (`current4`, Static 2)** — add across firmware + MQTT + Pi + register map.
    All 4 currents use the 4-state string; static channels are ON/FAIL_OPEN only.
 3. **Modbus-offset bitmask (10000+)** stays; HMI will later expose it as a separate advanced panel.
