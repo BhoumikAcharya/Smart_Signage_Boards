@@ -28,9 +28,9 @@ LEFT chase 10 s  →  RIGHT chase 10 s  →  ALL OFF 3 s  →  (repeat)
 
 Only the active side animates; the other side is held dark.
 
-**On power-on it runs Chase 3 at a 200 ms step delay** — the chosen signage animation. Plug the
-board in and that is what plays, with no Serial input at all. Everything else below is available
-over Serial for comparison, and none of it persists across a reset.
+**On power-on it runs Chase 2 with a 2-LED arrow at a 250 ms step delay** — the chosen signage
+animation. Plug the board in and that is what plays, with no Serial input at all. Everything else
+below is available over Serial for comparison, and none of it persists across a reset.
 
 Three things are different from `Firmware_Test.ino`:
 
@@ -47,7 +47,8 @@ There are **no sensor or voltage commands here**. Use `Firmware_Test.ino` for th
 ## 2. How the animation is built
 
 Each strip has 5 channels (`0`–`4`). The arrow **head** walks from channel 4 down to channel 0, with
-the body trailing behind it. With the default 3-LED arrow:
+the body trailing behind it. Taking a 3-LED arrow as the illustration (Chase 1, which keeps every
+frame):
 
 | Frame | Channels lit | Notes |
 |-------|--------------|-------|
@@ -58,16 +59,27 @@ the body trailing behind it. With the default 3-LED arrow:
 | 4 | `A0, A4, A3` | **wrap** |
 
 Frames 3 and 4 are the ones where the arrow visually "breaks apart" and stops reading as an arrow.
-That's exactly what **Chase 2** removes.
+That's exactly what **Chase 2** — the boot default — removes.
 
 ### The three chase modes
 
 - **Chase 1 (`c 1`)** — plays all 5 frames including the wrap. Continuous motion, but the
   arrow splits across the seam twice per cycle.
-- **Chase 2 (`c 2`)** — stops after the last frame that fits inside the strip (`A2, A1, A0` for a
-  3-LED arrow) and **restarts at `A4, A3, A2`**. The arrow always reads cleanly 4→0, at the cost of
-  a visible jump back to the top.
-- **Chase 3 (`c 3`, the boot default)** — **spaced trail.** Two dots sit **2 channels apart** instead of touching, and
+- **Chase 2 (`c 2`, the boot default)** — stops after the last frame that fits inside the strip and
+  **restarts at the top**. The arrow always reads cleanly 4→0, at the cost of a visible jump back to
+  the top. At the default **2-LED** width that's a 4-frame cycle:
+
+| Frame | Channels lit |
+|-------|--------------|
+| 0 | `A4, A3` |
+| 1 | `A3, A2` |
+| 2 | `A2, A1` |
+| 3 | `A1, A0` → restart |
+
+  Two adjacent LEDs sliding 4→0, then jumping back. At a 3-LED width it's `A4,A3,A2` → `A3,A2,A1` →
+  `A2,A1,A0`, a 3-frame cycle.
+
+- **Chase 3 (`c 3`)** — **spaced trail.** Two dots sit **2 channels apart** instead of touching, and
   the trailing dot is simply **not lit until it lands on the strip**. Head still walks 4→0, no wrap,
   resets after the head reaches `A0`:
 
@@ -94,14 +106,17 @@ Frame count per cycle:
 | Arrow LEDs | Chase 1 | Chase 2 | Chase 3 |
 |-----------|---------|---------|---------|
 | 1 | 5 | 5 (identical — a single LED never wraps) | 5 (single dot) |
-| **2** | 5 | 4 | **5** |
-| **3** | **5** | **3** | 5 (capped to 2 dots) |
+| **2** | 5 | **4** ← default | 5 |
+| 3 | 5 | 3 | 5 (capped to 2 dots) |
 | 4 | 5 | 2 | 5 (capped to 2 dots) |
 | 5 | 5 | 1 (all channels on, static) | 5 (capped to 2 dots) |
 
-> Because Chase 2 has fewer frames, one full cycle takes **less time** at the same step delay. A
-> 3-LED Chase 2 cycle is 3 × delay; Chase 1 and Chase 3 are 5 × delay. Expect Chase 2 to look faster
-> even though the per-step speed is unchanged.
+> Because Chase 2 has fewer frames, one full cycle takes **less time** at the same step delay. Chase
+> 1 and Chase 3 are always 5 × delay; Chase 2 shrinks as the arrow gets wider. Expect Chase 2 to look
+> faster even though the per-step speed is unchanged.
+>
+> At the boot default — **Chase 2, 2 LEDs, 250 ms** — one sweep is 4 × 250 ms = **exactly 1 s**, so a
+> 10-second side fits 10 whole sweeps and ends on a frame boundary rather than mid-arrow.
 
 ---
 
@@ -115,32 +130,31 @@ Serial Monitor at **115200 baud**, line ending set to **Newline** (or Both NL & 
 | `1` … `5` | Set the number of LEDs in the arrow (bare number shortcut) |
 | `n 2` | Same thing, explicit form |
 | `c 1` | **Chase 1** — arrow wraps around the strip |
-| `c 2` | **Chase 2** — arrow resets after `A2, A1, A0` |
-| `c 3` | **Chase 3** — spaced trail, 2 dots 2 channels apart, resets after `A0` (**boot default**) |
-| `d 200` | Set the step delay to 200 ms (accepts **5–5000**) |
+| `c 2` | **Chase 2** — arrow resets at the end of the strip (**boot default**) |
+| `c 3` | **Chase 3** — spaced trail, 2 dots 2 channels apart, resets after `A0` |
+| `d 250` | Set the step delay to 250 ms (accepts **5–5000**) |
 | `p` | Pause / resume the demo (pausing turns all LEDs off) |
 | `?` | Print current settings **and the full frame table** |
 | `h` | Reprint the menu |
 
-**Power-on defaults:** **Chase 3, 200 ms step delay**, LED count 3. These are **not** saved across a
-reset — every power cycle comes back to Chase 3 @ 200 ms, as intended.
+**Power-on defaults:** **Chase 2, 2 LEDs, 250 ms step delay.** These are **not** saved across a
+reset — every power cycle comes back to Chase 2 / 2 LEDs / 250 ms, as intended.
 
-> The LED count of 3 only matters if you switch to Chase 1 or Chase 2, since **Chase 3 caps at
-> 2 dots** (see §2). It's left at 3 so that typing `c 1` or `c 2` gives you the familiar 3-LED arrow
-> to compare against. The boot status line prints a note reminding you of the cap.
+> Unlike Chase 3 (which caps at 2 dots regardless), Chase 2 uses the LED count directly — it sets
+> both the **arrow width** and the **frame count**, so changing it also changes how long one sweep
+> takes. See the table in §2.
 
 Changing any setting **restarts the animation from frame 0** so the new geometry is visible
 immediately instead of appearing mid-sweep. The 10 s / 10 s / 3 s phase timing keeps running
 underneath — a setting change does not restart the demo phases.
 
 The `?` output shows the live frame table with bits printed **4→0** (`A4 A3 A2 A1 A0`), so
-`[11100]` means A4, A3, A2 are lit:
+`[11000]` means A4 and A3 are lit:
 
 ```
->> LEDs:3  Mode:3 (spaced trail, reset at end)  Delay:200 ms  Frames:5  running
-   frames: [10000] [01000] [10100] [01010] [00101]
+>> LEDs:2  Mode:2 (reset at end)  Delay:250 ms  Frames:4  running
+   frames: [11000] [01100] [00110] [00011]
    (bit order shown is 4..0, i.e. A4 A3 A2 A1 A0)
-   (Chase 3 is a 2-dot pattern — the LED count of 3 is capped at 2)
 ```
 
 ---
@@ -152,8 +166,8 @@ The `?` output shows the live frame table with bits printed **4→0** (`A4 A3 A2
 2. Open Serial Monitor @ **115200 baud**, line ending **Newline**.
 3. Confirm `Probing MCP23017 @0x20 on SDA=4/SCL=13 ... OK`. If it says `NOT FOUND!` the sketch
    halts — fix the I2C wiring first (see [`../TESTING_GUIDE.md`](../TESTING_GUIDE.md) §4 Step 1).
-4. Confirm the boot status line reads **`Mode:3 (spaced trail, reset at end)  Delay:200 ms`** and
-   that the spaced-trail animation starts on its own.
+4. Confirm the boot status line reads **`LEDs:2  Mode:2 (reset at end)  Delay:250 ms  Frames:4`**
+   and that the animation starts on its own.
 
 ### Step 1 — Confirm the reversed direction
 1. Watch the LEFT phase. The arrow must move **from A4 towards A0** — i.e. from the far end of the
@@ -168,60 +182,61 @@ The `?` output shows the live frame table with bits printed **4→0** (`A4 A3 A2
 2. During LEFT, the RHS strips must be **completely off** (and vice versa). Any bleed-through means
    a MOSFET is stuck on — go back to `Firmware_Test.ino` and test that channel with `0`–`9`.
 
-### Step 3 — Confirm the default animation (Chase 3)
-1. Straight out of boot you should see the **spaced trail**: a single dot at `A4`, then `A3`, then
-   two dots at `A2`+`A4`, `A1`+`A3`, `A0`+`A2`, then back to the start.
-2. Confirm the gap between the two dots is exactly **one dark channel**.
-3. Confirm **`A4` stays off in the final `A0`+`A2` frame** — it must not flash back on as the arrow
-   finishes.
-4. Confirm the step rate looks like **200 ms** — a full 5-frame sweep takes about **1 second**, so
-   roughly 10 sweeps per 10-second side.
+### Step 3 — Confirm the default animation (Chase 2, 2 LEDs)
+1. Straight out of boot you should see **two adjacent LEDs** sliding down the strip: `A4`+`A3` →
+   `A3`+`A2` → `A2`+`A1` → `A1`+`A0`, then **jumping back to the top**.
+2. Confirm the two LEDs are **touching** — there must be no dark channel between them (a gap means
+   you're in Chase 3, not Chase 2).
+3. Confirm the arrow **never splits across the ends** of the strip — you should never see `A0` lit
+   together with `A4`. That would mean Chase 1.
+4. Confirm the step rate looks like **250 ms** — a full 4-frame sweep takes **exactly 1 second**, so
+   you should count 10 clean sweeps per 10-second side, with the side ending on a whole sweep.
 
 ### Step 4 — Compare against the other chase modes
-1. Type `c 1` + Enter. You get the 3-LED solid arrow with the two wrap frames where it splits across
-   the ends of the strip.
-2. Type `c 2` + Enter. The split frames disappear — the arrow runs `A4,A3,A2` → `A3,A2,A1` →
-   `A2,A1,A0` and then **jumps back to the top**.
-3. Type `c 3` + Enter to return to the default.
+1. Type `c 1` + Enter. Same 2-LED arrow, but now it **wraps** — watch for the frame where `A0` and
+   `A4` are lit together and the arrow breaks across the seam.
+2. Type `c 3` + Enter. The two dots separate to **2 channels apart**: `A4` → `A3` → `A2`+`A4` →
+   `A1`+`A3` → `A0`+`A2`, then restart.
+3. Type `c 2` + Enter to return to the default.
 4. Decide which reads better on the real signage board at viewing distance. That's the whole point
    of this sketch.
 
 ### Step 5 — Arrow width
-1. Type `2` + Enter. In Chase 1 or 2 the arrow narrows to **2 LEDs**; in Chase 3 nothing changes,
-   since it is already a 2-dot pattern.
-2. Type `1` + Enter. A **single LED** should walk 4→3→2→1→0 and repeat, in every mode.
-3. Type `4`, then `5`, while in Chase 1 or 2. At 5 the whole strip is lit (an arrow as wide as the
-   strip has nowhere to move in Chase 2, and just rotates in Chase 1).
-4. Type `3` to return to the default. Type `?` to confirm the frame table matches what you see.
+1. Type `3` + Enter. In Chase 2 the arrow widens to **3 LEDs** and the cycle drops to **3 frames**,
+   so one sweep gets shorter (3 × 250 ms) even though the step rate is unchanged.
+2. Type `1` + Enter. A **single LED** should walk 4→3→2→1→0 and repeat.
+3. Type `4`, then `5`. At 5 the whole strip is lit — an arrow as wide as the strip has nowhere to
+   move in Chase 2 (1 frame), and just rotates in Chase 1.
+4. Type `2` to return to the default. Type `?` to confirm the frame table matches what you see.
 5. Try an out-of-range value like `7` — it should reject with `!! LED count must be 1-5` and leave
    the animation untouched.
-6. While in Chase 3, type `3` — it should accept the value but print the **2-dot cap note**, and the
-   animation should stay at two dots.
+6. Switch to `c 3` and type `3` — it should accept the value but print the **2-dot cap note**, and
+   the animation should stay at two dots. Then `c 2` and `2` to get back to the default.
 
 ### Step 6 — Speed
-1. Type `d 350` + Enter — the chase should visibly slow down from the 200 ms default.
+1. Type `d 400` + Enter — the chase should visibly slow down from the 250 ms default.
 2. Type `d 60` — noticeably faster.
-3. Sweep for the speed that looks right on the physical board, then `d 200` to return to the
-   default. Typical range to try: **80–300 ms**.
+3. Sweep for the speed that looks right on the physical board, then `d 250` to return to the
+   default. Typical range to try: **80–350 ms**.
 4. Try `d 2` — it should reject with `!! Delay must be 5-5000 ms`.
 
 > **Note:** at very short delays you're limited by the I2C write rate to the MCP23017. If the
 > animation stops getting faster below ~20 ms, that's the bus, not the code.
 
 ### Step 7 — Record the winning combination
-The current defaults are **Chase 3 @ 200 ms**. If bench testing lands somewhere else, write down
-what you settled on:
+The current defaults are **Chase 2, 2 LEDs, 250 ms**. If bench testing lands somewhere else, write
+down what you settled on:
 
 - **Chase mode:** ______ (1 = wrap, 2 = reset, 3 = spaced trail)
+- **Arrow LEDs:** ______ (drives width *and* frame count in modes 1 and 2; capped at 2 in mode 3)
 - **Step delay:** ______ ms
-- **Arrow LEDs:** ______ (only applies to modes 1 and 2)
 
 To change the power-on defaults, edit the constants near the top of `led_test_2.ino`:
 
 ```cpp
-const int           DEFAULT_LEDS  = 3;   // arrow width for modes 1/2 (mode 3 caps at 2 dots)
-const int           DEFAULT_MODE  = 3;   // spaced trail, reset at end
-const unsigned long DEFAULT_DELAY = 200; // ms per animation step
+const int           DEFAULT_LEDS  = 2;   // arrow is 2 LEDs wide
+const int           DEFAULT_MODE  = 2;   // reset at end (no wrap)
+const unsigned long DEFAULT_DELAY = 250; // ms per animation step
 ```
 
 These same three values are what should eventually be carried into the production firmware's
@@ -232,15 +247,16 @@ animation code.
 ## 5. Pass criteria
 
 - [ ] MCP23017 detected `OK` on SDA=4 / SCL=13.
-- [ ] Demo starts on its own at power-on — no key press required — in **Chase 3 @ 200 ms**.
+- [ ] Demo starts on its own at power-on — no key press required — in **Chase 2 / 2 LEDs / 250 ms**.
 - [ ] Chase runs **A4→A0** on the LEFT phase and **B4→B0** on the RIGHT phase.
 - [ ] Phase timing is 10 s / 10 s / 3 s, with the idle side fully dark.
-- [ ] The default `c 3` runs `A4` → `A3` → `A2,A4` → `A1,A3` → `A0,A2` and then restarts, with `A4`
-      **off** in that final frame — at any LED count.
-- [ ] `c 1` / `c 2` still switch to the solid-arrow modes, and `c 3` returns to the default.
-- [ ] Typing `1`–`5` changes the arrow width live in modes 1 and 2, without stopping the demo.
+- [ ] The default `c 2` runs `A4,A3` → `A3,A2` → `A2,A1` → `A1,A0` and then restarts at the top, with
+      the two LEDs **touching** and **never** `A0` and `A4` lit together.
+- [ ] One sweep takes ~1 s, so a 10-second side shows ~10 whole sweeps.
+- [ ] `c 1` / `c 3` still switch to the other modes, and `c 2` returns to the default.
+- [ ] Typing `1`–`5` changes the arrow width live, without stopping the demo.
 - [ ] `d <ms>` changes the speed live.
-- [ ] After a power cycle, the sketch comes back at **Chase 3 / 200 ms**.
+- [ ] After a power cycle, the sketch comes back at **Chase 2 / 2 LEDs / 250 ms**.
 
 ---
 

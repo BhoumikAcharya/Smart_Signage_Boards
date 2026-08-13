@@ -9,16 +9,16 @@
  * Differences vs Firmware_Test.ino:
  *   - Chase direction is REVERSED: A4->A0 / B4->B0 (was A0->A4 / B0->B4).
  *   - The animation is generated at runtime instead of using fixed frames, so
- *     the number of lit LEDs in the arrow is adjustable (1-5, default 3).
+ *     the number of lit LEDs in the arrow is adjustable (1-5, default 2).
  *   - Three chase modes: (1) wrapping loop, (2) reset at the end of the strip,
  *     (3) spaced trail with two dots 2 channels apart, reset at the end.
  *   - The step delay is adjustable in ms.
  *   - The demo is NON-BLOCKING, so settings can be changed live over Serial
  *     without stopping the animation.
  *
- * BOOT DEFAULT: CHASE 3 at 200 ms. That is the chosen signage animation —
- * power the board on and it runs with no Serial input at all. Modes 1 and 2 and
- * the other adjustments remain available over Serial for comparison.
+ * BOOT DEFAULT: CHASE 2, 2-LED arrow, 250 ms. That is the chosen signage
+ * animation — power the board on and it runs with no Serial input at all. The
+ * other modes and adjustments remain available over Serial for comparison.
  *
  * Sensors / voltage dividers are intentionally NOT included here — use
  * Firmware_Test.ino for those. This build is only about the LEDs.
@@ -39,11 +39,13 @@ const unsigned long RIGHT_MS = 10000;
 const unsigned long OFF_MS   = 3000;
 
 // --- DEFAULTS ON POWER-ON ---
-// The board boots into CHASE 3 at 200 ms — that is the animation the signage
-// actually runs. Modes 1 and 2 stay available over Serial for comparison.
-const int           DEFAULT_LEDS  = 3;   // arrow width for modes 1/2 (mode 3 caps at 2 dots)
-const int           DEFAULT_MODE  = 3;   // spaced trail, reset at end
-const unsigned long DEFAULT_DELAY = 200; // ms per animation step
+// The board boots into CHASE 2 with a 2-LED arrow at 250 ms — that is the
+// animation the signage actually runs. Modes 1 and 3 stay available over Serial
+// for comparison. At 2 LEDs mode 2 is a 4-frame cycle, so one sweep takes
+// exactly 1 s and each 10 s side ends on a frame boundary.
+const int           DEFAULT_LEDS  = 2;   // arrow is 2 LEDs wide
+const int           DEFAULT_MODE  = 2;   // reset at end (no wrap)
+const unsigned long DEFAULT_DELAY = 250; // ms per animation step
 
 // --- LIVE SETTINGS (changed over Serial) ---
 int           chaseLeds  = DEFAULT_LEDS;
@@ -217,15 +219,15 @@ void printMenu() {
   Serial.println(F("Runs the DEMO loop automatically on power-on:"));
   Serial.println(F("  LEFT chase 10s -> RIGHT chase 10s -> OFF 3s (repeat)"));
   Serial.println(F("Chase direction: A4->A0 and B4->B0"));
-  Serial.println(F("Boot default:    CHASE 3 @ 200 ms"));
+  Serial.println(F("Boot default:    CHASE 2, 2 LEDs, 250 ms"));
   Serial.println(F("------------------------------------------"));
   Serial.println(F("Commands (type, then press Enter):"));
-  Serial.println(F("  <1-5>     -> set number of LEDs in the arrow (default 3)"));
+  Serial.println(F("  <1-5>     -> set number of LEDs in the arrow (default 2)"));
   Serial.println(F("  n <1-5>   -> same as above, explicit form"));
   Serial.println(F("  c 1       -> CHASE 1: arrow wraps around (A1,A0,A4 ...)"));
-  Serial.println(F("  c 2       -> CHASE 2: arrow resets after A2,A1,A0"));
-  Serial.println(F("  c 3       -> CHASE 3: spaced trail, 2 dots 2 channels apart (default)"));
-  Serial.println(F("  d <ms>    -> set step delay in milliseconds (default 200)"));
+  Serial.println(F("  c 2       -> CHASE 2: arrow resets at the end (default)"));
+  Serial.println(F("  c 3       -> CHASE 3: spaced trail, 2 dots 2 channels apart"));
+  Serial.println(F("  d <ms>    -> set step delay in milliseconds (default 250)"));
   Serial.println(F("  p         -> pause / resume the demo"));
   Serial.println(F("  ?         -> show current settings + frame table"));
   Serial.println(F("  h         -> show this menu"));
