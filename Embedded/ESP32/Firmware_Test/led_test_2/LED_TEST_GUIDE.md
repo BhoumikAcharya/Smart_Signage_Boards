@@ -3,6 +3,10 @@
 > Companion to [`../TESTING_GUIDE.md`](../TESTING_GUIDE.md). That guide proves the **board** works.
 > This one is for tuning the **arrow chase animation** on the bench — direction, arrow width,
 > reset behaviour, and speed.
+>
+> **Implementing the animation in the production firmware?** Read
+> [`CHASE_ANIMATION_SPEC.md`](./CHASE_ANIMATION_SPEC.md) instead — it is the implementation contract
+> and is self-contained. This document is a bench procedure, not a spec.
 
 ---
 
