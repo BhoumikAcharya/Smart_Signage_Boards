@@ -1,7 +1,7 @@
 {
-  "version": 3,
+  "version": 4,
   "targets": {
-    "net10.0-windows7.0": {
+    "net10.0-windows": {
       "Microsoft.Bcl.Cryptography/9.0.13": {
         "type": "package",
         "compile": {
@@ -356,6 +356,19 @@
         "runtime": {
           "lib/netstandard2.0/Microsoft.SqlServer.Server.dll": {
             "related": ".pdb;.xml"
+          }
+        }
+      },
+      "NModbus4/2.1.0": {
+        "type": "package",
+        "compile": {
+          "lib/net40/NModbus4.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net40/NModbus4.dll": {
+            "related": ".xml"
           }
         }
       },
@@ -2086,6 +2099,20 @@
         "microsoft.sqlserver.server.nuspec"
       ]
     },
+    "NModbus4/2.1.0": {
+      "sha512": "hGoxVFImyP2UC/vyaBjS3ZCLEqn3nqDWOfiePUfSTPpI4EhF4xUe6VnQ5W6m9oFK/6unKAaWQZh89WE+I31Spw==",
+      "type": "package",
+      "path": "nmodbus4/2.1.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "NModbus4.pdb",
+        "lib/net40/NModbus4.dll",
+        "lib/net40/NModbus4.xml",
+        "nmodbus4.2.1.0.nupkg.sha512",
+        "nmodbus4.nuspec"
+      ]
+    },
     "runtime.android-arm.runtime.native.System.IO.Ports/10.0.7": {
       "sha512": "qu635VwrbDMft1Nh5XBfRG8G/ORCWbLbPpFh0gH4wW4ZtnXSm/7nPj8U0SuDHUskdNzXrmIVT362v4417p7fJw==",
       "type": "package",
@@ -2666,29 +2693,30 @@
     }
   },
   "projectFileDependencyGroups": {
-    "net10.0-windows7.0": [
+    "net10.0-windows": [
       "Microsoft.Data.SqlClient >= 7.0.0",
+      "NModbus4 >= 2.1.0",
       "System.IO.Ports >= 10.0.7"
     ]
   },
   "packageFolders": {
-    "C:\\Users\\user\\.nuget\\packages\\": {},
+    "C:\\Users\\rakgo\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
-    "version": "1.0.0",
+    "version": "2.0.0",
     "restore": {
-      "projectUniqueName": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\CompanyUtilityApp.csproj",
+      "projectUniqueName": "C:\\e\\Projects\\B_Smart_Signage_WFA\\Sinage_Project_Local\\CompanyUtilityApp\\CompanyUtilityApp\\CompanyUtilityApp.csproj",
       "projectName": "CompanyUtilityApp",
-      "projectPath": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\CompanyUtilityApp.csproj",
-      "packagesPath": "C:\\Users\\user\\.nuget\\packages\\",
-      "outputPath": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\obj\\",
+      "projectPath": "C:\\e\\Projects\\B_Smart_Signage_WFA\\Sinage_Project_Local\\CompanyUtilityApp\\CompanyUtilityApp\\CompanyUtilityApp.csproj",
+      "packagesPath": "C:\\Users\\rakgo\\.nuget\\packages\\",
+      "outputPath": "C:\\e\\Projects\\B_Smart_Signage_WFA\\Sinage_Project_Local\\CompanyUtilityApp\\CompanyUtilityApp\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
       ],
       "configFilePaths": [
-        "C:\\Users\\user\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\rakgo\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
@@ -2700,15 +2728,15 @@
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
-        "net10.0-windows7.0": {
+        "net10.0-windows": {
           "framework": "net10.0-windows7.0",
           "targetAlias": "net10.0-windows",
           "projectReferences": {}
         }
       },
       "warningProperties": {
-        "warnAsError": [
-          "NU1605"
+        "noWarn": [
+          "NU1701"
         ]
       },
       "restoreAuditProperties": {
@@ -2716,16 +2744,20 @@
         "auditLevel": "low",
         "auditMode": "all"
       },
-      "SdkAnalysisLevel": "10.0.200"
+      "SdkAnalysisLevel": "10.0.400"
     },
     "frameworks": {
-      "net10.0-windows7.0": {
+      "net10.0-windows": {
         "framework": "net10.0-windows7.0",
         "targetAlias": "net10.0-windows",
         "dependencies": {
           "Microsoft.Data.SqlClient": {
             "target": "Package",
             "version": "[7.0.0, )"
+          },
+          "NModbus4": {
+            "target": "Package",
+            "version": "[2.1.0, )"
           },
           "System.IO.Ports": {
             "target": "Package",
@@ -2751,7 +2783,7 @@
             "privateAssets": "none"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.203/PortableRuntimeIdentifierGraph.json",
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json",
         "packagesToPrune": {
           "Microsoft.CSharp": "(,4.7.32767]",
           "Microsoft.VisualBasic": "(,10.4.32767]",

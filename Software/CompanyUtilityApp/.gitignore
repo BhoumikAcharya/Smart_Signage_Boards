@@ -1,0 +1,30 @@
+# Build output
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / VS Code
+.idea/
+.vscode/
+
+# Local runtime artefacts
+*.log
+
+# Local configuration overrides.
+# appsettings.json IS tracked: it holds non-secret site defaults.
+# Copy it to appsettings.Local.json for machine-specific values.
+appsettings.Local.json
+
+# Database files, if a local .mdf is ever attached
+*.mdf
+*.ldf
+
+# NuGet
+*.nupkg
+packages/

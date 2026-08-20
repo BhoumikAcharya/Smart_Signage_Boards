@@ -6,9 +6,10 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v10.0": {
-      "CompanyUtilityApp/1.0.0": {
+      "CompanyUtilityApp/2.0.0": {
         "dependencies": {
           "Microsoft.Data.SqlClient": "7.0.0",
+          "NModbus4": "2.1.0",
           "System.IO.Ports": "10.0.7"
         },
         "runtime": {
@@ -38,47 +39,6 @@
           "lib/net9.0/Microsoft.Data.SqlClient.dll": {
             "assemblyVersion": "7.0.0.0",
             "fileVersion": "7.0.0.26076"
-          }
-        },
-        "resources": {
-          "lib/net9.0/cs/Microsoft.Data.SqlClient.resources.dll": {
-            "locale": "cs"
-          },
-          "lib/net9.0/de/Microsoft.Data.SqlClient.resources.dll": {
-            "locale": "de"
-          },
-          "lib/net9.0/es/Microsoft.Data.SqlClient.resources.dll": {
-            "locale": "es"
-          },
-          "lib/net9.0/fr/Microsoft.Data.SqlClient.resources.dll": {
-            "locale": "fr"
-          },
-          "lib/net9.0/it/Microsoft.Data.SqlClient.resources.dll": {
-            "locale": "it"
-          },
-          "lib/net9.0/ja/Microsoft.Data.SqlClient.resources.dll": {
-            "locale": "ja"
-          },
-          "lib/net9.0/ko/Microsoft.Data.SqlClient.resources.dll": {
-            "locale": "ko"
-          },
-          "lib/net9.0/pl/Microsoft.Data.SqlClient.resources.dll": {
-            "locale": "pl"
-          },
-          "lib/net9.0/pt-BR/Microsoft.Data.SqlClient.resources.dll": {
-            "locale": "pt-BR"
-          },
-          "lib/net9.0/ru/Microsoft.Data.SqlClient.resources.dll": {
-            "locale": "ru"
-          },
-          "lib/net9.0/tr/Microsoft.Data.SqlClient.resources.dll": {
-            "locale": "tr"
-          },
-          "lib/net9.0/zh-Hans/Microsoft.Data.SqlClient.resources.dll": {
-            "locale": "zh-Hans"
-          },
-          "lib/net9.0/zh-Hant/Microsoft.Data.SqlClient.resources.dll": {
-            "locale": "zh-Hant"
           }
         },
         "runtimeTargets": {
@@ -269,6 +229,14 @@
           "lib/netstandard2.0/Microsoft.SqlServer.Server.dll": {
             "assemblyVersion": "1.0.0.0",
             "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "NModbus4/2.1.0": {
+        "runtime": {
+          "lib/net40/NModbus4.dll": {
+            "assemblyVersion": "2.1.0.0",
+            "fileVersion": "2.1.0.0"
           }
         }
       },
@@ -476,7 +444,7 @@
     }
   },
   "libraries": {
-    "CompanyUtilityApp/1.0.0": {
+    "CompanyUtilityApp/2.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
@@ -606,6 +574,13 @@
       "sha512": "sha512-N4KeF3cpcm1PUHym1RmakkzfkEv3GRMyofVv40uXsQhCQeglr2OHNcUk2WOG51AKpGO8ynGpo9M/kFXSzghwug==",
       "path": "microsoft.sqlserver.server/1.0.0",
       "hashPath": "microsoft.sqlserver.server.1.0.0.nupkg.sha512"
+    },
+    "NModbus4/2.1.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-hGoxVFImyP2UC/vyaBjS3ZCLEqn3nqDWOfiePUfSTPpI4EhF4xUe6VnQ5W6m9oFK/6unKAaWQZh89WE+I31Spw==",
+      "path": "nmodbus4/2.1.0",
+      "hashPath": "nmodbus4.2.1.0.nupkg.sha512"
     },
     "runtime.android-arm.runtime.native.System.IO.Ports/10.0.7": {
       "type": "package",

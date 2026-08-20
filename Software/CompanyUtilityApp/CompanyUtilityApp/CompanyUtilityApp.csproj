@@ -3,15 +3,46 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyVersion>1.2.0.0</AssemblyVersion>
-    <FileVersion>1.3.0.0</FileVersion>
+    <RootNamespace>CompanyUtilityApp</RootNamespace>
+
+    <!-- Treat nullable and unused-code findings as build breaks rather than a
+         backlog of 80 warnings nobody reads. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors>CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625</WarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+
+    <!-- Version and identity shown in the About dialog and in file properties. -->
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+    <Product>Node Calibration for Smart Signage</Product>
+    <Company>I2ST Technologies Pvt. Ltd.</Company>
+    <Copyright>Copyright © I2ST Technologies Pvt. Ltd. 2026</Copyright>
+    <Description>Configures and calibrates ESP32 smart-signage controllers over USB serial and Ethernet.</Description>
+
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <NeutralLanguage>en</NeutralLanguage>
+
+    <!-- NModbus4 2.1.0 ships .NET Framework binaries only, so restore reports
+         NU1701 on a net10.0 target. It loads and runs through the compatibility
+         shim, and the Modbus paths are exercised only by the diagnostics screens.
+         Suppressed deliberately rather than left as recurring noise.
+
+         RECOMMENDED FOLLOW-UP: migrate to the maintained 'NModbus' package, which
+         targets .NET Standard. The API differs (factory-based master creation),
+         so the change is contained to ModbusDiagnosticsService but needs testing
+         against the real gateway before it is trusted. -->
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.0" />
+    <PackageReference Include="NModbus4" Version="2.1.0" />
     <PackageReference Include="System.IO.Ports" Version="10.0.7" />
   </ItemGroup>
 
@@ -31,13 +62,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Configuration must sit beside the executable so a site engineer can edit
+         it without a rebuild. Copied every build so edits to the source file are
+         not silently ignored. -->
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="DocumentFiles\Sinage_Project_Node_Calibration_2.pdf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Models\" />
   </ItemGroup>
 
 </Project>

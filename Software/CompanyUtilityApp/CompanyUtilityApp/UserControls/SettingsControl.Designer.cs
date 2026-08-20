@@ -1,4 +1,5 @@
-﻿namespace CompanyUtilityApp
+﻿#nullable disable
+namespace CompanyUtilityApp.UserControls
 {
     partial class SettingsControl
     {
@@ -58,7 +59,6 @@
             label2.Size = new Size(111, 20);
             label2.TabIndex = 1;
             label2.Text = "Phone Number:";
-            label2.Click += label2_Click;
             // 
             // label3
             // 

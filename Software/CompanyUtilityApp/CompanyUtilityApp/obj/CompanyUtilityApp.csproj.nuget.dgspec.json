@@ -1,23 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\CompanyUtilityApp.csproj": {}
+    "C:\\e\\Projects\\B_Smart_Signage_WFA\\Sinage_Project_Local\\CompanyUtilityApp\\CompanyUtilityApp\\CompanyUtilityApp.csproj": {}
   },
   "projects": {
-    "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\CompanyUtilityApp.csproj": {
-      "version": "1.0.0",
+    "C:\\e\\Projects\\B_Smart_Signage_WFA\\Sinage_Project_Local\\CompanyUtilityApp\\CompanyUtilityApp\\CompanyUtilityApp.csproj": {
+      "version": "2.0.0",
       "restore": {
-        "projectUniqueName": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\CompanyUtilityApp.csproj",
+        "projectUniqueName": "C:\\e\\Projects\\B_Smart_Signage_WFA\\Sinage_Project_Local\\CompanyUtilityApp\\CompanyUtilityApp\\CompanyUtilityApp.csproj",
         "projectName": "CompanyUtilityApp",
-        "projectPath": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\CompanyUtilityApp.csproj",
-        "packagesPath": "C:\\Users\\user\\.nuget\\packages\\",
-        "outputPath": "E:\\Projects\\Sinage Project\\CompanyUtilityApp\\CompanyUtilityApp\\obj\\",
+        "projectPath": "C:\\e\\Projects\\B_Smart_Signage_WFA\\Sinage_Project_Local\\CompanyUtilityApp\\CompanyUtilityApp\\CompanyUtilityApp.csproj",
+        "packagesPath": "C:\\Users\\rakgo\\.nuget\\packages\\",
+        "outputPath": "C:\\e\\Projects\\B_Smart_Signage_WFA\\Sinage_Project_Local\\CompanyUtilityApp\\CompanyUtilityApp\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\user\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\rakgo\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -36,8 +36,8 @@
           }
         },
         "warningProperties": {
-          "warnAsError": [
-            "NU1605"
+          "noWarn": [
+            "NU1701"
           ]
         },
         "restoreAuditProperties": {
@@ -45,7 +45,7 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.200"
+        "SdkAnalysisLevel": "10.0.400"
       },
       "frameworks": {
         "net10.0-windows": {
@@ -55,6 +55,10 @@
             "Microsoft.Data.SqlClient": {
               "target": "Package",
               "version": "[7.0.0, )"
+            },
+            "NModbus4": {
+              "target": "Package",
+              "version": "[2.1.0, )"
             },
             "System.IO.Ports": {
               "target": "Package",
@@ -80,7 +84,7 @@
               "privateAssets": "none"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.203/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",

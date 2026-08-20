@@ -1,4 +1,5 @@
-﻿namespace CompanyUtilityApp
+﻿#nullable disable
+namespace CompanyUtilityApp.UserControls
 {
     partial class NetworkControl
     {
@@ -108,7 +109,6 @@
             label4.Size = new Size(122, 20);
             label4.TabIndex = 3;
             label4.Text = "Default Gateway:";
-            label4.Click += label4_Click;
             // 
             // label3
             // 
@@ -136,7 +136,6 @@
             label1.Size = new Size(128, 20);
             label1.TabIndex = 0;
             label1.Text = "Ethernet Settings: ";
-            label1.Click += label1_Click;
             // 
             // panel2
             // 
@@ -199,7 +198,6 @@
             label9.Size = new Size(122, 20);
             label9.TabIndex = 4;
             label9.Text = "Default Gateway:";
-            label9.Click += label9_Click;
             // 
             // label8
             // 
