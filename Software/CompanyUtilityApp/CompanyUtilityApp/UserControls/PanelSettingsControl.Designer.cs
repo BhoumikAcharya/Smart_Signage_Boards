@@ -1,4 +1,5 @@
-﻿namespace CompanyUtilityApp.UserControls
+﻿#nullable disable
+namespace CompanyUtilityApp.UserControls
 {
     partial class PanelSettingsControl
     {
@@ -15,7 +16,7 @@
         {
             if (disposing)
             {
-                CloseSerialPort();
+                ReleaseResources();
                 if (components != null)
                     components.Dispose();
             }
@@ -63,6 +64,8 @@
             label6 = new Label();
             txtSens2 = new TextBox();
             label7 = new Label();
+            label11 = new Label();
+            txtNodeNumber = new TextBox();
             panel1.SuspendLayout();
             pnlAction.SuspendLayout();
             grpSerialMonitor.SuspendLayout();
@@ -223,6 +226,8 @@
             // 
             // panel1
             // 
+            panel1.Controls.Add(txtNodeNumber);
+            panel1.Controls.Add(label11);
             panel1.Controls.Add(txtTargetIP);
             panel1.Controls.Add(label10);
             panel1.Controls.Add(chkOTA);
@@ -400,6 +405,23 @@
             label7.TabIndex = 19;
             label7.Text = "ACS Sensitivity Value 2:";
             // 
+            // label11
+            // 
+            label11.AutoSize = true;
+            label11.Location = new Point(836, 122);
+            label11.Name = "label11";
+            label11.Size = new Size(107, 20);
+            label11.TabIndex = 5;
+            label11.Text = "Node Number:";
+            // 
+            // txtNodeNumber
+            // 
+            txtNodeNumber.Location = new Point(949, 119);
+            txtNodeNumber.Name = "txtNodeNumber";
+            txtNodeNumber.ReadOnly = true;
+            txtNodeNumber.Size = new Size(125, 27);
+            txtNodeNumber.TabIndex = 26;
+            // 
             // PanelSettingsControl
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
@@ -456,5 +478,7 @@
         private Label label7;
         private TextBox txtTargetIP;
         private Label label10;
+        private TextBox txtNodeNumber;
+        private Label label11;
     }
 }

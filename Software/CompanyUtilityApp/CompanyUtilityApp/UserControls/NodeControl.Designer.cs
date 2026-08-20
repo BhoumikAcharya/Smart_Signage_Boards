@@ -1,4 +1,5 @@
-﻿namespace CompanyUtilityApp
+﻿#nullable disable
+namespace CompanyUtilityApp.UserControls
 {
     partial class NodeControl
     {

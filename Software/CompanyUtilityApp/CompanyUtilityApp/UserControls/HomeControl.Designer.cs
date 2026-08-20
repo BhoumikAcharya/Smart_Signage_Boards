@@ -1,4 +1,5 @@
-﻿namespace CompanyUtilityApp
+﻿#nullable disable
+namespace CompanyUtilityApp.UserControls
 {
     partial class HomeControl
     {
@@ -44,7 +45,6 @@
             label1.TabIndex = 0;
             label1.Text = "Node Calibration v1.0\r\nCopyright © I2STechnologies 2026";
             label1.TextAlign = ContentAlignment.MiddleCenter;
-            label1.Click += label1_Click;
             // 
             // pictureBox1
             // 

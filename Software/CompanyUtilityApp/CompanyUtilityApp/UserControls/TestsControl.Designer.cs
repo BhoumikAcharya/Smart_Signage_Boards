@@ -1,4 +1,5 @@
-﻿namespace CompanyUtilityApp
+﻿#nullable disable
+namespace CompanyUtilityApp.UserControls
 {
     partial class TestsControl
     {
@@ -40,7 +41,6 @@
             label1.Size = new Size(146, 20);
             label1.TabIndex = 0;
             label1.Text = "Under Development.";
-            label1.Click += label1_Click;
             // 
             // TestsControl
             // 
