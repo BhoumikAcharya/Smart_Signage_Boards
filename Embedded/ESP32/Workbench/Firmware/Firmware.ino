@@ -1,43 +1,49 @@
 /*
- * ESP32 Enterprise Signage Controller — Firmware v3.0.0
- * =====================================================
+ * ESP32 Enterprise Signage Controller — Firmware v4.0.0-p1
+ * ========================================================
  * Target : PCB V3, ESP32 + LAN8720 + MCP23017 (10 MOSFETs) + 4x ACS712
  * Pairs with : RaspberryPi/Gateway/Pi.py v2.0.0
  * Contract   : ESP32/esp32_contract.md
  *
- * THIS IS THE BENCH / BRING-UP ROUND (6 nodes).
- *   - Calibration constants live at the top of this file and are hand-editable.
- *   - The 'c' / 'g' / 'v' serial commands derive them automatically and print a
- *     paste-ready block. NVS persistence is DEFERRED — you calibrate, paste,
- *     reflash. When NVS lands, the same routines write to flash instead and the
- *     reflash step disappears. Nothing else has to change.
+ * PHASE 1 · PART 1 — HARDCODED BENCH BUILD, NO BATTERY.
+ *   The purpose of this build is bring-up: get a handful of nodes onto Ethernet,
+ *   connected to the Pi/broker, executing commands and streaming telemetry so
+ *   they can be left running and observed. Everything is baked into source.
  *
- * WHAT CHANGED FROM v2.0 (all deliberate, see esp32_contract.md §8):
- *   1.  I2C moved 16/17 -> 4/13. GPIO17 is the LAN8720 50MHz clock.
- *   2.  4th ACS712 added (GPIO33, Static Zone 2) + 'current4' topic.
- *   3.  Modes 4/5/6 added. MODE 4 CHANGED MEANING: was solid-ON-all, now
- *       solid-ON-LEFT. Old solid-ON-all is now mode 6. Clear retained 'value'
- *       topics on the broker before flashing or a stale retained 4 lights the
- *       wrong zone.
- *   4.  'state' topic added — what this node is ACTUALLY executing, published
- *       only AFTER the MOSFET write is verified. Gateway exposes it at diag
- *       register +7 and flags commanded != actual.
- *   5.  Command parsing is validated. v2.0 used atoi(), so a corrupt payload
- *       became 0 == "arrows off" and silently blanked the sign.
- *   6.  Animation no longer stops when MQTT drops. v2.0 only called the state
- *       machine inside the connected branch, so a broker outage froze the chase
- *       mid-frame — directly contradicting the hold-last-command requirement.
- *   7.  MCP23017 failure no longer bricks the node. v2.0 did while(1) BEFORE
- *       ETH.begin(), so an I2C fault meant no network, no LWT, no telemetry —
- *       indistinguishable from a dead board. Boot order is now network-first
- *       and the MCP retries forever in the background.
- *   8.  MOSFET writes are read back and verified. writeGPIOA() returns void, so
- *       v2.0 could not tell a successful write from a failed one and would have
- *       reported a healthy 'state' while the sign was dark.
- *   9.  Thresholds are now set for BOTH sides on every mode change. v2.0 left
- *       stale thresholds on the side that turned off, which MASKED a real
- *       FAIL_SHORT (a shorted MOSFET read as OFF).
- *   10. Serial menu for bench work (h/s/r/c/g/v/m/p/i).
+ *   - ALL config is a compile-time const: per-unit IP + register, sensor
+ *     calibration (ZERO/SENS), the PSU divider ratio, and every threshold.
+ *     There is no runtime calibration and nothing is persisted — you edit the
+ *     constants below and reflash.
+ *   - The auto-calibration machinery (serial c/g/v/m/p) is GONE. Calibration
+ *     returns in Phase 2, writing derived values to NVS instead of RAM.
+ *   - Battery is GONE this build. No battery pin, no divider, no percentage,
+ *     nothing published. Battery logic is Phase 1 · Part 2.
+ *   - Serial menu is reduced to three commands: h (help), i (node info),
+ *     s (sensor stream).
+ *
+ * CALIBRATION HONESTY: the SENS/ZERO/divider values below are datasheet-nominal
+ * placeholders, NOT measured on this board. Ethernet, MQTT, command execution
+ * and the animation are unaffected — but the 4-state current health is only
+ * approximate until Phase-2 auto-calibration derives per-board values. Good
+ * enough to verify connectivity and functionality; not yet a trustworthy alarm.
+ *
+ * WHAT CARRIED OVER FROM v3.0.0 (unchanged, deliberate — see esp32_contract.md §8):
+ *   - I2C on 4/13 (GPIO17 is the LAN8720 50MHz clock).
+ *   - 4 ACS712 channels: current1/2 = LHS/RHS arrows (switched), current3/4 =
+ *     static zones 1/2 (hardwired always-on, monitored, never switched).
+ *   - Modes 0-6 plus the 10000-11023 raw MOSFET bitmask. Mode 4 = solid LEFT,
+ *     5 = solid RIGHT, 6 = solid ALL.
+ *   - 'state' topic = what the node is ACTUALLY executing, published only after a
+ *     verified MOSFET write. MCP unreachable => "FAULT" => gateway reads 65535.
+ *   - Validated command parse (strtol, not atoi): a corrupt payload is rejected,
+ *     never silently decoded as 0 = "arrows off".
+ *   - Animation runs unconditionally: the sign keeps animating through a broker
+ *     or link outage (hold-last-command). No NVS yet, so a reboot comes up dark
+ *     until the retained 'value' topic re-commands it.
+ *   - Network-first boot: an MCP/I2C fault never blocks the PHY, so the node
+ *     still comes ONLINE and reports the fault as 'state' = 65535.
+ *   - MOSFET writes are read back and verified; thresholds are set for BOTH
+ *     sides on every mode change.
  */
 
 #include <ETH.h>
@@ -53,7 +59,7 @@
 // ========================================================
 //  USER CONFIGURATION — CHANGE PER UNIT
 // ========================================================
-const char* mqtt_server_ip   = "192.168.1.10";
+const char* mqtt_server_ip   = "192.168.1.10";     // Pi, ESP32-side static IP
 const int   mqtt_port        = 1883;
 const int   ASSIGNED_REGISTER = 40001;              // node 1 = 40001, node 2 = 40002 ...
 
@@ -63,87 +69,51 @@ IPAddress subnet    (255, 255, 255, 0);
 IPAddress primaryDNS(8, 8, 8, 8);
 
 // ========================================================
-//  EXPECTED LOAD CURRENTS — reference for auto-calibration
-// ========================================================
-/*
- * Auto-calibration ('g') derives each channel's SENSITIVITY by driving a known
- * load and comparing the measured voltage against these numbers. Fill them in
- * from the strip specs (V x A/m x length) before running 'g'.
- *
- * !! READ THIS BEFORE TRUSTING THE RESULT !!
- * Calibrating gain against an ASSUMED current forces the sensor to agree with
- * that assumption. If the real strips draw something else, the sensor is now
- * calibrated to call the wrong current "normal" and will never alarm on it.
- * The derived value is therefore sanity-checked against the datasheet below and
- * a warning is printed on a large deviation. With 6 bench nodes: calibrate all
- * six and compare. Tight agreement => the assumption is sound. Scatter => the
- * strips, the sensors or the wiring genuinely vary. Find that here, not in a
- * station.
- */
-float EXPECTED_ARROW_PER_STRIP = 0.000f;   // A, ONE arrow strip lit     <-- FILL IN
-float EXPECTED_STATIC_1        = 0.000f;   // A, static zone 1 total     <-- FILL IN
-float EXPECTED_STATIC_2        = 0.000f;   // A, static zone 2 total     <-- FILL IN
-
-// ========================================================
-//  SENSOR CALIBRATION — hand-editable, overwritten by 'c'/'g'/'m'
+//  SENSOR CALIBRATION — HARDCODED (datasheet-nominal placeholders)
 // ========================================================
 /*
  * ACS712 SENSITIVITY by variant:      5A part = 0.185 V/A
  *                                    20A part = 0.100 V/A
  *                                    30A part = 0.066 V/A
  *
- * v2.0 shipped with 0.146, which matches NO standard variant. Treat every value
- * here as a placeholder until 'g' has been run on the actual board.
+ * These are const in this build: there is no runtime calibration. They are
+ * NOMINAL — the true per-board zero and gain are not measured until Phase-2
+ * auto-calibration. Edit here and reflash to change them.
  *
- * RESOLUTION NOTE — this drives which part goes where:
- *   One strip at THRESH_PER_STRIP (0.060 A) produces
- *       20A part: 6.0 mV  ~= 7 ADC counts   <-- marginal vs ADC noise
- *        5A part: 11.1 mV ~= 14 ADC counts  <-- roughly 2x the margin
- *   Detecting a whole side failing is fine either way (3 strips ~= 22 counts on
- *   the 20A part). It is the SINGLE-strip-out case that is at risk. So:
- *       ARROWS  -> prefer the 5A part  (low current, needs the resolution)
- *       STATIC  -> 20A part is fine    (higher current, only needs ON/FAIL_OPEN)
- *   Defaults below follow that. Flip them to match the parts actually fitted.
+ * Part choice (which sensitivity goes where):
+ *   ARROWS  -> 5A part  (low current, needs the ADC resolution to catch one
+ *              strip out: ~14 counts/strip vs ~7 on the 20A part).
+ *   STATIC  -> 20A part (higher current, only needs ON vs FAIL_OPEN).
+ * Flip the values to match the parts actually fitted.
  */
-float SENS_LEFT = 0.185f, ZERO_LEFT = 2.500f;   // arrows  — 5A part assumed
-float SENS_RGHT = 0.185f, ZERO_RGHT = 2.500f;   // arrows  — 5A part assumed
-float SENS_STA1 = 0.100f, ZERO_STA1 = 2.500f;   // static  — 20A part assumed
-float SENS_STA2 = 0.100f, ZERO_STA2 = 2.500f;   // static  — 20A part assumed
+const float SENS_LEFT = 0.185f, ZERO_LEFT = 2.500f;   // arrows  — 5A part assumed
+const float SENS_RGHT = 0.185f, ZERO_RGHT = 2.500f;   // arrows  — 5A part assumed
+const float SENS_STA1 = 0.100f, ZERO_STA1 = 2.500f;   // static  — 20A part assumed
+const float SENS_STA2 = 0.100f, ZERO_STA2 = 2.500f;   // static  — 20A part assumed
 
-// Datasheet reference used ONLY to sanity-check the derived gain.
-float DS_SENS_LEFT = 0.185f;   // 5A=0.185 | 20A=0.100 | 30A=0.066
-float DS_SENS_RGHT = 0.185f;   // 5A=0.185 | 20A=0.100 | 30A=0.066
-float DS_SENS_STA1 = 0.100f;   // 5A=0.185 | 20A=0.100 | 30A=0.066
-float DS_SENS_STA2 = 0.100f;   // 5A=0.185 | 20A=0.100 | 30A=0.066
-const float SENS_TOLERANCE = 0.20f;   // warn if derived deviates >20%
-
-// Voltage dividers. PLACEHOLDERS — set with 'v' against a multimeter reading.
-float PSU_DIV_RATIO  = 5.30f;   // Vbus  = Vadc * ratio
-float BATT_DIV_RATIO = 5.30f;   // Vbatt = Vadc * ratio  (battery stubbed, see below)
+// PSU voltage divider: Vbus = Vadc * ratio. Nominal placeholder — set from the
+// fitted resistors / a multimeter reading and reflash.
+const float PSU_DIV_RATIO = 5.30f;
 
 /*
  * PSU FAIL DETECTION — hysteresis + debounce.
  *
  * 'power=FAIL' from an ONLINE node is this system's critical alarm: a node
- * running on battery reporting that its PSU died. False positives are therefore
- * expensive — cry wolf a few times and the control room learns to ignore it.
+ * running on battery reporting that its PSU died. False positives are expensive.
  *
- * HYSTERESIS: a single edge makes a supply sagging to exactly the threshold
- * chatter OK/FAIL forever. Fail below FAIL_VOLTS, recover only above OK_VOLTS,
- * hold state in between.
- *
+ * HYSTERESIS: fail below FAIL_VOLTS, recover only above OK_VOLTS, hold in
+ * between, so a supply sagging to exactly the threshold cannot chatter.
  * DEBOUNCE: require N consecutive agreeing reads before flipping, so a mains dip
- * or the inrush from a large load switching cannot publish a one-cycle FAIL.
- * At the 500 ms sensor cadence, 3 reads = 1.5 s.
+ * or an inrush cannot publish a one-cycle FAIL. At 500 ms cadence, 3 reads ~1.5s.
  *
- * BOTH THRESHOLDS ARE PLACEHOLDERS. They must sit below the normal supply
- * voltage but ABOVE the battery's loaded voltage — otherwise the node reports
- * FAIL while running perfectly on mains. Set them from the real PSU and battery
- * chemistry on the bench.
+ * PLACEHOLDERS. They must sit below the normal supply voltage but ABOVE the
+ * battery's loaded voltage, or the node reports FAIL while running fine on mains.
+ * (The battery itself is not part of this build — that is Phase 1 · Part 2 — but
+ * these thresholds already anticipate it.) Set from the real PSU and reflash.
  */
-float PSU_FAIL_VOLTS = 10.0f;         // below this => FAIL
-float PSU_OK_VOLTS   = 11.0f;         // above this => OK (must be > PSU_FAIL_VOLTS)
-const int PWR_DEBOUNCE_COUNT = 3;     // consecutive agreeing reads before flipping
+const float PSU_FAIL_VOLTS = 10.0f;   // below this => FAIL
+const float PSU_OK_VOLTS   = 11.0f;   // above this => OK (must be > PSU_FAIL_VOLTS)
+const int   PWR_DEBOUNCE_COUNT = 3;   // consecutive agreeing reads before flipping
 
 // ========================================================
 //  DISCREPANCY THRESHOLDS
@@ -153,15 +123,11 @@ const float THRESHOLD_STATIC = 0.080f;  // static zones: load never changes
 
 /*
  * When a side is expected OFF we still need to catch a stuck-on MOSFET, so it
- * gets a LOW threshold rather than a stale high one. v2.0 left the previous
- * mode's threshold in place, which meant a shorted MOSFET drawing three strips
- * worth of current still read below it and reported OFF — a real fault silently
- * suppressed.
+ * gets a LOW threshold rather than a stale high one.
  *
  * ORDERING CONSTRAINT: NOISE_FLOOR must stay BELOW THRESH_OFF_DETECT. The noise
  * gate snaps small readings to zero; if it sat above the off-threshold it would
- * zero out exactly the currents FAIL_SHORT is meant to catch, re-creating the
- * bug by a different route.
+ * zero out exactly the currents FAIL_SHORT is meant to catch.
  */
 const float THRESH_OFF_DETECT = 0.030f;  // expected-OFF side: above this => FAIL_SHORT
 const float NOISE_FLOOR       = 0.020f;  // below this => treat as 0 A
@@ -172,17 +138,11 @@ const float ALPHA   = 0.15f;   // IIR low-pass
 /*
  * MODE-CHANGE SETTLE — do not evaluate current states straight after a switch.
  *
- * The IIR filter is deliberately slow. At ALPHA=0.15 and a 500 ms cadence it
- * needs roughly 14 samples (~7 s) to climb to 90% of a step change — and the
- * solid-ON threshold sits at exactly 90% of expected (4.5 of 5 strips). So
- * without this, EVERY mode change from off to on would publish FAIL_OPEN for
- * about seven seconds before self-clearing. Every command would raise a false
- * critical alarm.
- *
- * Two-part fix: the filter is SNAPPED to the instantaneous reading on a mode
- * change (the filter exists to smooth noise, not to smooth a step we ourselves
- * caused), and state evaluation is suppressed for a short window while the load
- * physically settles.
+ * The IIR filter is deliberately slow (~7 s to 90% of a step at ALPHA=0.15, 500ms
+ * cadence) and the solid-ON threshold sits at 90% of expected, so without this
+ * every off->on change would publish FAIL_OPEN for ~7 s before self-clearing.
+ * Fix: SNAP the filter to the instantaneous reading on a mode change, and
+ * suppress state evaluation for a short window while the load physically settles.
  */
 const unsigned long MODE_SETTLE_MS = 1200;
 volatile unsigned long lastModeChangeMs = 0;
@@ -196,11 +156,12 @@ volatile unsigned long lastModeChangeMs = 0;
 Adafruit_MCP23X17 mcp;
 
 const int PIN_VOLT_PSU  = 36;
-const int PIN_VOLT_BATT = 39;   // battery stubbed this round
-const int PIN_CURR_LEFT = 34;   // ACS712 #1  LHS arrows   (switched)
-const int PIN_CURR_RGHT = 35;   // ACS712 #2  RHS arrows   (switched)
+const int PIN_CURR_LEFT = 34;   // ACS712 #1  LHS arrows    (switched)
+const int PIN_CURR_RGHT = 35;   // ACS712 #2  RHS arrows    (switched)
 const int PIN_CURR_STA1 = 32;   // ACS712 #3  Static Zone 1 (always on)
 const int PIN_CURR_STA2 = 33;   // ACS712 #4  Static Zone 2 (always on)
+// NOTE: battery sense (was GPIO39) is intentionally absent — reintroduced in
+// Phase 1 · Part 2 together with the battery logic.
 
 #define ETH_PHY_ADDR  1
 #define ETH_PHY_POWER -1
@@ -237,7 +198,6 @@ bool eth_connected = false;
 volatile int  commandedValue = 0;    // last VALID command received
 volatile int  activeCommand  = 0;    // what we have actually, verifiably executed
 volatile bool mcpHealthy     = false;
-volatile bool calibrationActive = false;
 
 volatile bool  expectLeftOn  = false;
 volatile bool  expectRightOn = false;
@@ -331,16 +291,16 @@ void publishState() {
    *   Command rejected  -> we are still faithfully running the PREVIOUS mode and
    *                        we know it. Publish that real number.
    *   MCP unreachable   -> we do NOT know what the outputs are doing. Publish a
-   *   or calibrating       non-numeric payload; the gateway maps it to 65535.
+   *                        non-numeric payload; the gateway maps it to 65535.
    *
    * Why not reuse the last known number in the second case: an operator could
-   * clear the alarm by accident. They see the mismatch, try commanding the value
-   * that happens to match the stale number, gateway sees commanded == actual,
-   * the flag clears and the screen goes green — while the sign is still dark.
-   * 65535 can never equal a valid command, so the fault cannot be hidden by
-   * commanding anything. It clears only when the hardware is fixed.
+   * clear the alarm by accident. They see the mismatch, command the value that
+   * happens to match the stale number, gateway sees commanded == actual, the
+   * flag clears and the screen goes green — while the sign is still dark. 65535
+   * can never equal a valid command, so the fault cannot be hidden by commanding
+   * anything. It clears only when the hardware is fixed.
    */
-  if (!mcpHealthy || calibrationActive) {
+  if (!mcpHealthy) {
     client.publish(topic_state, "FAULT", true);
     return;
   }
@@ -364,10 +324,9 @@ void publish_state_msg(NodeStateMsg msg) {
   client.publish(topic_status, onlineMsg, true);
   client.publish(topic_power, msg.power_ok ? "OK" : "FAIL", true);
 
-  // Suppress current states until the first real sensor cycle has run, and while
-  // calibrating (we are deliberately switching loads; the readings are garbage
-  // relative to the commanded mode and would alarm a live control room).
-  if (haveSensorData && !calibrationActive) {
+  // Suppress current states until the first real sensor cycle has run, so the
+  // gateway never sees a startup default that looks like a reading.
+  if (haveSensorData) {
     client.publish(topic_curr1, msg.state_left,  true);
     client.publish(topic_curr2, msg.state_right, true);
     client.publish(topic_curr3, msg.state_sta1,  true);
@@ -376,8 +335,8 @@ void publish_state_msg(NodeStateMsg msg) {
 
   publishState();
 
-  // battery_pct is deliberately NOT published. The gateway maps a missing value
-  // to 65535 = unknown. Publishing 0 would read as a genuinely flat battery.
+  // battery_pct is NOT published in this build — no battery logic yet (Phase 1 ·
+  // Part 2). The gateway maps a missing value to 65535 = unknown, never 0%.
 }
 
 // ========================================================
@@ -402,10 +361,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 
   /*
-   * Validated parse. v2.0 used atoi(), which returns 0 for unparseable input —
-   * and 0 is a perfectly valid command meaning "arrows off". A corrupt payload
-   * therefore blanked the sign with no error anywhere. strtol lets us tell
-   * "the number zero" from "not a number".
+   * Validated parse. atoi() returns 0 for unparseable input — and 0 is a valid
+   * command meaning "arrows off", so a corrupt payload would blank the sign with
+   * no error anywhere. strtol lets us tell "the number zero" from "not a number".
    */
   char* endp = nullptr;
   long v = strtol(msgBuffer, &endp, 10);
@@ -437,9 +395,9 @@ int countActiveStrips(uint8_t portMask) {
 /*
  * Set the discrepancy threshold for BOTH sides on every mode change.
  *
- * v2.0 only ever set the side that was turning ON, leaving the other side
- * carrying the previous mode's threshold. Modes 4 and 5 are the trap: one side
- * goes solid while the other must be expected OFF.
+ * Only ever setting the side turning ON leaves the other side carrying the
+ * previous mode's threshold. Modes 4 and 5 are the trap: one side goes solid
+ * while the other must be expected OFF.
  */
 void setThresholds(int nLeft, int nRight) {
   if (nLeft > 0) {
@@ -462,18 +420,16 @@ void setThresholds(int nLeft, int nRight) {
  * The animation state machine.
  *
  * Runs UNCONDITIONALLY from loop() — not gated on MQTT, not gated on MCP health.
- * Two separate jobs happen here: bookkeeping (counting time, tracking which of
- * the 5 frames is next) and sending (pushing it over I2C). If the network drops
- * we must keep animating, per the hold-last-command failsafe. If the MCP is
- * dead the send fails harmlessly but the bookkeeping keeps ticking, so the
- * moment I2C recovers the next frame goes out and the sign resumes on its own.
+ * Two separate jobs: bookkeeping (counting time, tracking which of the 5 frames
+ * is next) and sending (pushing it over I2C). If the network drops we must keep
+ * animating, per the hold-last-command failsafe. If the MCP is dead the send
+ * fails harmlessly but the bookkeeping keeps ticking, so the moment I2C recovers
+ * the next frame goes out and the sign resumes on its own.
  */
 void runAnimationStateMachine() {
   static unsigned long previousMillis = 0;
   static int currentFrame = 0;
   static int lastExecutedCommand = -1;
-
-  if (calibrationActive) return;   // calibration owns the outputs
 
   unsigned long now = millis();
   int cmd = commandedValue;
@@ -494,9 +450,9 @@ void runAnimationStateMachine() {
         case 1: portA = chaseFrames[currentFrame]; portB = 0x00;                  break;
         case 2: portA = 0x00;                    portB = chaseFrames[currentFrame]; break;
         case 3: portA = chaseFrames[currentFrame]; portB = chaseFrames[currentFrame]; break;
-        case 4: portA = 0x1F;                    portB = 0x00;                    break;  // LEFT only (was all-on in v2.0)
-        case 5: portA = 0x00;                    portB = 0x1F;                    break;
-        case 6: portA = 0x1F;                    portB = 0x1F;                    break;  // the old mode 4
+        case 4: portA = 0x1F;                    portB = 0x00;                    break;  // LEFT only
+        case 5: portA = 0x00;                    portB = 0x1F;                    break;  // RIGHT only
+        case 6: portA = 0x1F;                    portB = 0x1F;                    break;  // ALL
       }
 
       if (modeChanged) {
@@ -600,7 +556,7 @@ void SensorTask(void* parameter) {
   for (;;) {
     esp_task_wdt_reset();
 
-    if (!calibrationActive && millis() - lastRead >= 500) {
+    if (millis() - lastRead >= 500) {
       lastRead = millis();
       bool changed = false;
 
@@ -672,234 +628,23 @@ void SensorTask(void* parameter) {
 }
 
 // ========================================================
-//  SERIAL MENU — bench / commissioning
+//  SERIAL MENU — bench observation only (h / i / s)
 // ========================================================
 
 void printMenu() {
   Serial.println(F("\n=============================================="));
-  Serial.printf ("  SIGNAGE NODE v3.0.0  —  register %d\n", ASSIGNED_REGISTER);
+  Serial.printf ("  SIGNAGE NODE v4.0.0-p1  —  register %d\n", ASSIGNED_REGISTER);
   Serial.println(F("=============================================="));
   Serial.println(F("  h -> this menu"));
   Serial.println(F("  i -> node info (net, MCP health, active mode)"));
-  Serial.println(F("  r -> read all sensors ONCE"));
   Serial.println(F("  s -> toggle sensor STREAM (1 Hz, raw + volts + amps)"));
-  Serial.println(F("  c -> auto-calibrate ZERO points (arrows only)"));
-  Serial.println(F("  g -> auto-calibrate GAIN from expected currents"));
-  Serial.println(F("  v -> calibrate voltage dividers (needs a multimeter)"));
-  Serial.println(F("  m -> manually set one channel's zero/sens"));
-  Serial.println(F("  p -> print paste-ready calibration block"));
   Serial.println(F("==============================================\n"));
-}
-
-/*
- * Serial line read that keeps the system alive while it waits. Anything that
- * blocks in this firmware MUST pump the watchdog and the MQTT client — a bare
- * delay() loop would drop the broker session on keepalive and then trip the 15 s
- * watchdog into a panic reboot. (This is why the Firmware_Test menu handlers
- * cannot simply be copied across: they use blocking delay().)
- */
-bool readSerialLine(char* buf, size_t len, unsigned long timeoutMs) {
-  size_t i = 0;
-  unsigned long start = millis();
-  while (millis() - start < timeoutMs) {
-    esp_task_wdt_reset();
-    if (client.connected()) client.loop();
-    while (Serial.available()) {
-      char ch = Serial.read();
-      if (ch == '\n' || ch == '\r') {
-        if (i > 0) { buf[i] = '\0'; return true; }
-      } else if (i < len - 1) {
-        buf[i++] = ch;
-      }
-    }
-    delay(2);
-  }
-  buf[0] = '\0';
-  return false;
-}
-
-void calSettle(unsigned long ms) {
-  unsigned long start = millis();
-  while (millis() - start < ms) {
-    esp_task_wdt_reset();
-    if (client.connected()) client.loop();
-    delay(5);
-  }
-}
-
-void enterCalMode() {
-  calibrationActive = true;
-  publishState();     // -> FAULT -> gateway reads 65535
-  Serial.println(F("\n[CAL] Entering calibration. Node stays ONLINE; 'state' now reports"));
-  Serial.println(F("      65535 so SCADA shows an un-clearable mismatch for the duration."));
-}
-
-void exitCalMode() {
-  calibrationActive = false;
-  writePortsVerified(lastPortA, lastPortB);   // restore the commanded output
-  publishState();
-  Serial.println(F("[CAL] Done. Output state restored, telemetry resumed.\n"));
-}
-
-void checkDerivedSens(const char* name, float derived, float datasheet) {
-  float dev = (datasheet > 0) ? (derived - datasheet) / datasheet : 0;
-  Serial.printf("[CAL] %-6s derived SENS = %.4f V/A  (datasheet %.3f, %+.1f%%)  %s\n",
-                name, derived, datasheet, dev * 100.0f,
-                (fabs(dev) > SENS_TOLERANCE) ? "** CHECK LOAD/WIRING **" : "OK");
-}
-
-/*
- * 'c' — ZERO POINT.
- * Fully automatic for the arrows: switch the MOSFETs off, average the ADC.
- *
- * NOT possible for the static zones. They are hardwired always-on with no
- * MOSFET, so while the board is powered there is ALWAYS current through those
- * two sensors and a true zero can never be observed. That leaves one
- * measurement against two unknowns (zero and gain) — mathematically
- * underdetermined, no unique solution. So one has to come from outside, and the
- * best available estimate is the arrows' measured zero: same part, same 5 V
- * rail, same board, same temperature, same ADC. Far better than the datasheet's
- * nominal 2.5 V.
- */
-void calibrateZero() {
-  enterCalMode();
-  Serial.println(F("[CAL] All MOSFETs OFF, settling 2 s..."));
-  writePortsVerified(0x00, 0x00);
-  calSettle(2000);
-
-  ZERO_LEFT = adcVolts(PIN_CURR_LEFT);
-  ZERO_RGHT = adcVolts(PIN_CURR_RGHT);
-  float borrowed = (ZERO_LEFT + ZERO_RGHT) / 2.0f;
-  ZERO_STA1 = borrowed;
-  ZERO_STA2 = borrowed;
-
-  Serial.printf("[CAL] ZERO_LEFT = %.4f V   (measured)\n", ZERO_LEFT);
-  Serial.printf("[CAL] ZERO_RGHT = %.4f V   (measured)\n", ZERO_RGHT);
-  Serial.printf("[CAL] ZERO_STA1 = %.4f V   (BORROWED from arrows — see note)\n", ZERO_STA1);
-  Serial.printf("[CAL] ZERO_STA2 = %.4f V   (BORROWED from arrows — see note)\n", ZERO_STA2);
-  Serial.println(F("[CAL] Static zones cannot be zeroed in place (no MOSFET to switch)."));
-  Serial.println(F("      For a true static zero, calibrate before the strips are wired."));
-
-  exitCalMode();
-}
-
-/*
- * 'g' — GAIN, derived from the EXPECTED_* constants.
- * Drives each side solid ON and solves sens = (Vmeasured - Vzero) / Iexpected.
- */
-void calibrateGain() {
-  if (EXPECTED_ARROW_PER_STRIP <= 0 || EXPECTED_STATIC_1 <= 0 || EXPECTED_STATIC_2 <= 0) {
-    Serial.println(F("[CAL] ABORT: EXPECTED_* currents are still 0.000."));
-    Serial.println(F("      Fill them in at the top of the file first."));
-    return;
-  }
-
-  enterCalMode();
-
-  float iArrow = EXPECTED_ARROW_PER_STRIP * 5.0f;   // solid ON = 5 strips
-
-  Serial.println(F("[CAL] LEFT solid ON, settling 2 s..."));
-  writePortsVerified(0x1F, 0x00);
-  calSettle(2000);
-  SENS_LEFT = (adcVolts(PIN_CURR_LEFT) - ZERO_LEFT) / iArrow;
-
-  Serial.println(F("[CAL] RIGHT solid ON, settling 2 s..."));
-  writePortsVerified(0x00, 0x1F);
-  calSettle(2000);
-  SENS_RGHT = (adcVolts(PIN_CURR_RGHT) - ZERO_RGHT) / iArrow;
-
-  writePortsVerified(0x00, 0x00);
-  calSettle(1000);
-  SENS_STA1 = (adcVolts(PIN_CURR_STA1) - ZERO_STA1) / EXPECTED_STATIC_1;
-  SENS_STA2 = (adcVolts(PIN_CURR_STA2) - ZERO_STA2) / EXPECTED_STATIC_2;
-
-  Serial.println();
-  checkDerivedSens("LEFT", SENS_LEFT, DS_SENS_LEFT);
-  checkDerivedSens("RGHT", SENS_RGHT, DS_SENS_RGHT);
-  checkDerivedSens("STA1", SENS_STA1, DS_SENS_STA1);
-  checkDerivedSens("STA2", SENS_STA2, DS_SENS_STA2);
-  Serial.println(F("[CAL] Reminder: gain derived from ASSUMED current. Run all 6 bench"));
-  Serial.println(F("      nodes and compare — tight agreement validates the assumption."));
-
-  exitCalMode();
-}
-
-void calibrateDividers() {
-  char buf[24];
-
-  Serial.println(F("\n[CAL] Divider ratio cannot be self-derived — the node can only read a"));
-  Serial.println(F("      voltage, never the true bus voltage. Measure it and type it in."));
-
-  Serial.print(F("[CAL] Measured PSU bus volts (blank to skip): "));
-  if (readSerialLine(buf, sizeof(buf), 30000) && buf[0]) {
-    float actual = atof(buf);
-    float vadc = adcVolts(PIN_VOLT_PSU);
-    if (actual > 0 && vadc > 0.01f) {
-      PSU_DIV_RATIO = actual / vadc;
-      Serial.printf("\n[CAL] PSU_DIV_RATIO = %.4f  (ADC saw %.4f V)\n", PSU_DIV_RATIO, vadc);
-    } else Serial.println(F("\n[CAL] Skipped — bad input or no signal."));
-  } else Serial.println(F("\n[CAL] Skipped."));
-
-  Serial.print(F("[CAL] Measured BATTERY volts (blank to skip): "));
-  if (readSerialLine(buf, sizeof(buf), 30000) && buf[0]) {
-    float actual = atof(buf);
-    float vadc = adcVolts(PIN_VOLT_BATT);
-    if (actual > 0 && vadc > 0.01f) {
-      BATT_DIV_RATIO = actual / vadc;
-      Serial.printf("\n[CAL] BATT_DIV_RATIO = %.4f  (ADC saw %.4f V)\n", BATT_DIV_RATIO, vadc);
-    } else Serial.println(F("\n[CAL] Skipped — bad input or no signal."));
-  } else Serial.println(F("\n[CAL] Skipped."));
-}
-
-void manualCalibrate() {
-  char buf[24];
-  Serial.print(F("\n[MAN] Channel (1=LEFT 2=RGHT 3=STA1 4=STA2): "));
-  if (!readSerialLine(buf, sizeof(buf), 20000)) { Serial.println(F("\n[MAN] Timeout.")); return; }
-  int ch = atoi(buf);
-  if (ch < 1 || ch > 4) { Serial.println(F("\n[MAN] Bad channel.")); return; }
-
-  Serial.print(F("\n[MAN] ZERO volts (blank keeps current): "));
-  bool gotZ = readSerialLine(buf, sizeof(buf), 20000) && buf[0];
-  float z = gotZ ? atof(buf) : 0;
-
-  Serial.print(F("\n[MAN] SENS V/A (blank keeps current): "));
-  char buf2[24];
-  bool gotS = readSerialLine(buf2, sizeof(buf2), 20000) && buf2[0];
-  float s = gotS ? atof(buf2) : 0;
-
-  switch (ch) {
-    case 1: if (gotZ) ZERO_LEFT = z; if (gotS && s > 0) SENS_LEFT = s; break;
-    case 2: if (gotZ) ZERO_RGHT = z; if (gotS && s > 0) SENS_RGHT = s; break;
-    case 3: if (gotZ) ZERO_STA1 = z; if (gotS && s > 0) SENS_STA1 = s; break;
-    case 4: if (gotZ) ZERO_STA2 = z; if (gotS && s > 0) SENS_STA2 = s; break;
-  }
-  Serial.println(F("\n[MAN] Applied (RAM only — press 'p' and paste to make it stick)."));
-}
-
-/*
- * 'p' — paste-ready block. NVS is deferred this round, so calibration survives a
- * reboot only by being pasted back into the source and reflashed. When NVS
- * lands, these same routines write to flash and this step goes away.
- */
-void printCalBlock() {
-  Serial.println(F("\n// ---- PASTE INTO THE CALIBRATION BLOCK ----"));
-  Serial.printf("float SENS_LEFT = %.4ff, ZERO_LEFT = %.4ff;\n", SENS_LEFT, ZERO_LEFT);
-  Serial.printf("float SENS_RGHT = %.4ff, ZERO_RGHT = %.4ff;\n", SENS_RGHT, ZERO_RGHT);
-  Serial.printf("float SENS_STA1 = %.4ff, ZERO_STA1 = %.4ff;\n", SENS_STA1, ZERO_STA1);
-  Serial.printf("float SENS_STA2 = %.4ff, ZERO_STA2 = %.4ff;\n", SENS_STA2, ZERO_STA2);
-  Serial.printf("float PSU_DIV_RATIO  = %.4ff;\n", PSU_DIV_RATIO);
-  Serial.printf("float BATT_DIV_RATIO = %.4ff;\n", BATT_DIV_RATIO);
-  Serial.println(F("// ------------------------------------------"));
-  // CSV for cross-comparing the 6 bench nodes in a spreadsheet.
-  Serial.printf("CSV,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n",
-                ASSIGNED_REGISTER, ZERO_LEFT, SENS_LEFT, ZERO_RGHT, SENS_RGHT,
-                ZERO_STA1, SENS_STA1, ZERO_STA2, SENS_STA2);
 }
 
 void readSensorsVerbose() {
   int rl = getMedianADC(PIN_CURR_LEFT), rr = getMedianADC(PIN_CURR_RGHT);
   int r1 = getMedianADC(PIN_CURR_STA1), r2 = getMedianADC(PIN_CURR_STA2);
-  int rp = getMedianADC(PIN_VOLT_PSU),  rb = getMedianADC(PIN_VOLT_BATT);
+  int rp = getMedianADC(PIN_VOLT_PSU);
 
   float vl = (rl / 4095.0f) * ADC_REF, vr = (rr / 4095.0f) * ADC_REF;
   float v1 = (r1 / 4095.0f) * ADC_REF, v2 = (r2 / 4095.0f) * ADC_REF;
@@ -919,8 +664,6 @@ void readSensorsVerbose() {
                 getDiscrepancyState(true, fabs((v2 - ZERO_STA2) / SENS_STA2), THRESHOLD_STATIC));
   Serial.printf("  PSU    %5d   %.4f  ->  %.2f V\n", rp, (rp / 4095.0f) * ADC_REF,
                 (rp / 4095.0f) * ADC_REF * PSU_DIV_RATIO);
-  Serial.printf("  BATT   %5d   %.4f  ->  %.2f V   (stubbed, not published)\n", rb,
-                (rb / 4095.0f) * ADC_REF, (rb / 4095.0f) * ADC_REF * BATT_DIV_RATIO);
 }
 
 void printInfo() {
@@ -932,8 +675,8 @@ void printInfo() {
   Serial.printf("  MCP23017      : %s\n", mcpHealthy ? "healthy" : "UNHEALTHY");
   Serial.printf("  Commanded     : %d\n", commandedValue);
   char act[24];
-  if (!mcpHealthy || calibrationActive) snprintf(act, sizeof(act), "UNKNOWN (65535)");
-  else                                  snprintf(act, sizeof(act), "%d", activeCommand);
+  if (!mcpHealthy) snprintf(act, sizeof(act), "UNKNOWN (65535)");
+  else             snprintf(act, sizeof(act), "%d", activeCommand);
   Serial.printf("  Actually doing: %s\n", act);
   Serial.printf("  Ports  A=0x%02X  B=0x%02X\n", lastPortA, lastPortB);
   Serial.println(F("-------------------------------------------"));
@@ -948,16 +691,10 @@ void handleSerial() {
   while (Serial.available() && (Serial.peek() == '\n' || Serial.peek() == '\r')) Serial.read();
 
   switch (c) {
-    case 'h': printMenu();            break;
-    case 'i': printInfo();            break;
-    case 'r': readSensorsVerbose();   break;
+    case 'h': printMenu();          break;
+    case 'i': printInfo();          break;
     case 's': sensorStream = !sensorStream;
               Serial.printf(">> Sensor stream %s\n", sensorStream ? "ON" : "OFF"); break;
-    case 'c': calibrateZero();        break;
-    case 'g': calibrateGain();        break;
-    case 'v': calibrateDividers();    break;
-    case 'm': manualCalibrate();      break;
-    case 'p': printCalBlock();        break;
     default: break;
   }
 }
@@ -972,7 +709,7 @@ void setup() {
 
   analogReadResolution(12);
   analogSetAttenuation(ADC_11db);
-  pinMode(PIN_VOLT_PSU, INPUT);  pinMode(PIN_VOLT_BATT, INPUT);
+  pinMode(PIN_VOLT_PSU, INPUT);
   pinMode(PIN_CURR_LEFT, INPUT); pinMode(PIN_CURR_RGHT, INPUT);
   pinMode(PIN_CURR_STA1, INPUT); pinMode(PIN_CURR_STA2, INPUT);
 
@@ -988,12 +725,11 @@ void setup() {
   /*
    * NETWORK FIRST — deliberately before the MCP23017.
    *
-   * v2.0 initialised the MCP first and did while(1) on failure, ~24 lines before
-   * ETH.begin(). An I2C fault therefore meant the PHY never came up, MQTT never
-   * connected, and the LWT never even registered (it is part of client.connect).
-   * The node went completely mute and looked identical to an unplugged cable.
-   * Now the node always gets online and reports what it can, and an MCP fault
-   * surfaces as 'state' = 65535 on an ONLINE node — a distinct signature.
+   * Initialising the MCP first and doing while(1) on failure means an I2C fault
+   * blocks the PHY: MQTT never connects, the LWT never registers (it is part of
+   * client.connect), and the node goes mute, indistinguishable from an unplugged
+   * cable. Network-first, the node always gets online and reports what it can,
+   * and an MCP fault surfaces as 'state' = 65535 on an ONLINE node.
    */
   WiFi.onEvent(eth_event_handler);
   ETH.begin(ETH_PHY_TYPE, ETH_PHY_ADDR, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_POWER, ETH_CLK_MODE);
@@ -1035,8 +771,8 @@ void loop() {
   ensureMcpHealthy();
 
   // Unconditional: the sign must keep animating through a broker or link outage.
-  // NVS persistence of the last command is deferred — on reboot the node comes up
-  // at 0 and waits for the retained 'value' topic to re-command it.
+  // NVS persistence of the last command is deferred to Phase 2 — on reboot the
+  // node comes up at 0 and waits for the retained 'value' topic to re-command it.
   runAnimationStateMachine();
 
   if (sensorStream && millis() - lastStream >= 1000) {
