@@ -84,7 +84,7 @@
 			(mirror no)
 			(drillshape 0)
 			(scaleselection 1)
-			(outputdirectory "Gerber_Files_V2/")
+			(outputdirectory "Gerber/Gerber_Files_V2.2/")
 		)
 	)
 	(footprint "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
@@ -24489,7 +24489,19 @@
 		)
 	)
 	(gr_text "IN+"
-		(at 103.5 98.25 90)
+		(at 103.5 79.25 90)
+		(layer "F.SilkS")
+		(uuid "3c43a8a8-0e1b-4a11-a370-ebac99709b22")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "OUT+"
+		(at 103.5 97.75 90)
 		(layer "F.SilkS")
 		(uuid "0921eac2-0c80-4887-a4b8-56f104cc1867")
 		(effects
@@ -24524,10 +24536,10 @@
 			(justify left bottom)
 		)
 	)
-	(gr_text "IN-"
-		(at 111 79 90)
+	(gr_text "OUT-"
+		(at 111.75 97.5 90)
 		(layer "F.SilkS")
-		(uuid "b9450ba9-83f2-4a6e-9321-886c6d295be2")
+		(uuid "2eaad7cf-f533-4d2f-ab08-fccaba2343df")
 		(effects
 			(font
 				(size 1 1)
@@ -24536,10 +24548,10 @@
 			(justify left bottom)
 		)
 	)
-	(gr_text "OUT-"
-		(at 111 98 90)
+	(gr_text "IN-"
+		(at 112 79.25 90)
 		(layer "F.SilkS")
-		(uuid "2eaad7cf-f533-4d2f-ab08-fccaba2343df")
+		(uuid "0e01a9c6-e7a5-4fe5-a621-c977c9a228b4")
 		(effects
 			(font
 				(size 1 1)
@@ -24639,6 +24651,18 @@
 		(effects
 			(font
 				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "I2S Technologies Pvt. Ltd"
+		(at 222 118 90)
+		(layer "F.SilkS")
+		(uuid "e00ee14c-e8c6-4360-b8c0-8e92eeeca832")
+		(effects
+			(font
+				(size 2 2)
 				(thickness 0.1)
 			)
 			(justify left bottom)
