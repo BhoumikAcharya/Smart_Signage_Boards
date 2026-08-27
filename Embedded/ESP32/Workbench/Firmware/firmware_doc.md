@@ -15,7 +15,7 @@ Get a handful of nodes onto **wired Ethernet**, connected to the Pi/broker, exec
 
 Everything is **hardcoded**: per-unit IP + register, sensor calibration, the PSU divider ratio, and every threshold are compile-time `const`. There is no runtime calibration and nothing is persisted — you edit the constants at the top of the sketch and reflash.
 
-> **Calibration honesty.** The `SENS_*` / `ZERO_*` / `PSU_DIV_RATIO` values are **datasheet-nominal placeholders, not measured on the board.** Ethernet, MQTT, command execution and the animation are unaffected, but the 4-state current health is only **approximate** until Phase-2 auto-calibration derives per-board values. Good enough to verify connectivity and functionality; **not yet a trustworthy alarm.**
+> **Calibration honesty.** All four ACS712 current sensors are **5A modules** — arrows *and* static zones alike. Their datasheet sensitivity (nominally 0.185 V/A) has consistently proven **wrong** on these boards, so it is **not trusted**. For this round the sensitivity of every channel is **calibrated by hand**: measure it on the bench, edit the `SENS_*` constants in source, and reflash. Until that is done the `SENS_*` / `ZERO_*` / `PSU_DIV_RATIO` values in the sketch are **placeholders** — Ethernet, MQTT, command execution and the animation are unaffected, but the 4-state current health is only **approximate** and is **not yet a trustworthy alarm**. (Automated, NVS-backed calibration returns in Phase 2; this round is manual, edit-and-reflash.)
 
 ---
 
@@ -59,8 +59,8 @@ All at the top of the sketch.
 | `ASSIGNED_REGISTER` | `40001` | **Per-node.** node 1 = 40001, node 2 = 40002 … |
 | `local_IP` | `192.168.1.101` | **Per-node — must be unique.** |
 | `gateway_ip` / `subnet` / `primaryDNS` | `192.168.1.1` / `255.255.255.0` / `8.8.8.8` | Same for all nodes. |
-| `SENS_LEFT/RGHT` , `ZERO_*` | `0.185`, `2.500` | Arrows — 5A ACS712 assumed. **Nominal.** |
-| `SENS_STA1/STA2` | `0.100` | Static — 20A ACS712 assumed. **Nominal.** |
+| `SENS_LEFT/RGHT` , `ZERO_*` | `0.185`, `2.500` | Arrows — **5A** ACS712. Placeholder; **sensitivity set by manual per-channel calibration** this round (datasheet 0.185 is not trusted). |
+| `SENS_STA1/STA2` | `0.100` | Static — **5A** ACS712 (all four sensors are 5A). The `0.100` in the code is a **stale 20A placeholder**, wrong for a 5A part — **replace by manual calibration**. |
 | `PSU_DIV_RATIO` | `5.30` | **Nominal.** |
 | `PSU_FAIL_VOLTS` / `PSU_OK_VOLTS` | `10.0` / `11.0` | Hysteresis band. **Placeholders.** |
 | `THRESH_PER_STRIP` / `THRESHOLD_STATIC` | `0.060` / `0.080` A | Design thresholds. |
