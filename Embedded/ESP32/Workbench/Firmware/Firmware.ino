@@ -217,9 +217,17 @@ QueueHandle_t sensorQueue;
 NodeStateMsg networkState = {true, "OFF", "OFF", "OFF", "OFF"};
 volatile bool haveSensorData = false;  // written on core 0, read on core 1
 
-const uint8_t chaseFrames[5] = {0x07, 0x0E, 0x1C, 0x19, 0x13};
+/*
+ * Chase 1 (wrapping), 2-LED arrow, direction A4 -> A0. Five frames, repeating.
+ * Bits shown 4->0:  11000, 01100, 00110, 00011, 10001. The last is the WRAP
+ * frame — the arrow breaks across the seam (A4 + A0 lit together). That is
+ * intentional and defines Chase 1; it is what keeps the motion continuous with
+ * no jump-back. Do not "fix" it.
+ * Reference + rationale: Workbench/Firmware_Test/led_test_2/CHASE_ANIMATION_SPEC.md.
+ */
+const uint8_t chaseFrames[5] = {0x18, 0x0C, 0x06, 0x03, 0x11};
 const int numFrames = 5;
-const unsigned long FRAME_MS = 300;
+const unsigned long FRAME_MS = 250;   // 5 frames x 250 ms = 1.25 s per sweep
 
 // A named handler, not a lambda: WiFi.onEvent() is overloaded on three different
 // callback signatures and a lambda can make the overload ambiguous.
@@ -458,9 +466,9 @@ void runAnimationStateMachine() {
       if (modeChanged) {
         switch (cmd) {
           case 0: setThresholds(0, 0); break;
-          case 1: setThresholds(3, 0); break;
-          case 2: setThresholds(0, 3); break;
-          case 3: setThresholds(3, 3); break;
+          case 1: setThresholds(2, 0); break;   // chase lights 2 strips per frame
+          case 2: setThresholds(0, 2); break;
+          case 3: setThresholds(2, 2); break;
           case 4: setThresholds(5, 0); break;
           case 5: setThresholds(0, 5); break;
           case 6: setThresholds(5, 5); break;
@@ -506,7 +514,7 @@ void runAnimationStateMachine() {
   // Publish 'state' only AFTER a verified write. Never optimistically.
   if (activeCommand != cmd) {
     activeCommand = cmd;
-    // Stamp the MODE change only — not each chase frame. A chase holds 3 strips
+    // Stamp the MODE change only — not each chase frame. A chase holds 2 strips
     // lit throughout, so the load is steady and needs no settle window.
     lastModeChangeMs = millis();
     publishState();

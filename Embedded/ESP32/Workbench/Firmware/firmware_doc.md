@@ -39,6 +39,13 @@ This build is v3.0.0 with the calibration and battery scaffolding removed and th
 - Reduced from `h/i/r/s/c/g/v/m/p` to **`h` / `i` / `s`** (see §4). `r` (read-once) dropped; `readSensorsVerbose()` is retained because the `s` stream uses it.
 - `printMenu()` header now reads `v4.0.0-p1`.
 
+### Changed — chase animation (new frame table + delay)
+- The chase pattern (modes 1/2/3) is now **Chase 1: a 2-LED wrapping arrow**, direction `A4 → A0`, stepping every **250 ms** (was a 3-LED sliding window at 300 ms in v3.0.0).
+- Frame table `chaseFrames[] = {0x18, 0x0C, 0x06, 0x03, 0x11}` — bits `4→0`: `11000, 01100, 00110, 00011, 10001`. The last is the **wrap frame** (`A4`+`A0` lit together): the arrow breaks across the seam once per cycle, which is what keeps motion continuous with no jump-back. It is intentional; do not remove it.
+- One sweep = 5 × 250 ms = **1.25 s**. Solid modes 4/5/6 are unaffected (`0x1F`).
+- Because the arrow is now **2 strips wide**, the chase health thresholds were dropped accordingly: `setThresholds(2, …)` for modes 1/2/3 (were `3`). Expecting 3 strips of current while only 2 are lit would report `FAIL_OPEN` for the whole animation.
+- Source of truth for the pattern/rationale: [`../Firmware_Test/led_test_2/CHASE_ANIMATION_SPEC.md`](../Firmware_Test/led_test_2/CHASE_ANIMATION_SPEC.md). Note the production firmware is **command-driven** (mode 1 = LHS chase, 2 = RHS, 3 = both), so it does **not** implement that spec's bench-only phase loop (LEFT/RIGHT/OFF auto-cycling).
+
 ---
 
 ## 3. Hardcoded configuration (edit + reflash)
