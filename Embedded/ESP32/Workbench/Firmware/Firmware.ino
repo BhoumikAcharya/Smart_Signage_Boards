@@ -1,4 +1,6 @@
 /*
+ * 
+ * These are the values for the test PCB_1 (Marked with maskign tape)
  * ESP32 Enterprise Signage Controller — Firmware v4.0.0-p1
  * ========================================================
  * Target : PCB V3, ESP32 + LAN8720 + MCP23017 (10 MOSFETs) + 4x ACS712
@@ -86,14 +88,14 @@ IPAddress primaryDNS(8, 8, 8, 8);
  *   STATIC  -> 20A part (higher current, only needs ON vs FAIL_OPEN).
  * Flip the values to match the parts actually fitted.
  */
-const float SENS_LEFT = 0.185f, ZERO_LEFT = 2.500f;   // arrows  — 5A part assumed
-const float SENS_RGHT = 0.185f, ZERO_RGHT = 2.500f;   // arrows  — 5A part assumed
-const float SENS_STA1 = 0.100f, ZERO_STA1 = 2.500f;   // static  — 20A part assumed
-const float SENS_STA2 = 0.100f, ZERO_STA2 = 2.500f;   // static  — 20A part assumed
+const float SENS_LEFT = 0.185f, ZERO_LEFT = 2.20f;   // arrows  — 5A part 
+const float SENS_RGHT = 0.185f, ZERO_RGHT = 2.450f;   // arrows  — 5A part 
+const float SENS_STA1 = 0.185f, ZERO_STA1 = 2.500f;   // static  — 5A part 
+const float SENS_STA2 = 0.185f, ZERO_STA2 = 2.500f;   // static  — 5A part 
 
 // PSU voltage divider: Vbus = Vadc * ratio. Nominal placeholder — set from the
 // fitted resistors / a multimeter reading and reflash.
-const float PSU_DIV_RATIO = 5.30f;
+const float PSU_DIV_RATIO = 6.9f;
 
 /*
  * PSU FAIL DETECTION — hysteresis + debounce.
@@ -119,7 +121,7 @@ const int   PWR_DEBOUNCE_COUNT = 3;   // consecutive agreeing reads before flipp
 //  DISCREPANCY THRESHOLDS
 // ========================================================
 const float THRESH_PER_STRIP = 0.060f;  // min acceptable current for ONE strip
-const float THRESHOLD_STATIC = 0.080f;  // static zones: load never changes
+const float THRESHOLD_STATIC = 0.200f;  // static zones: load never changes
 
 /*
  * When a side is expected OFF we still need to catch a stuck-on MOSFET, so it
