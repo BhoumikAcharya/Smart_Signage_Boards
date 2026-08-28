@@ -554,7 +554,7 @@ const char* getDiscrepancyState(bool expectedOn, float actual, float threshold) 
 void SensorTask(void* parameter) {
   esp_task_wdt_add(NULL);
   NodeStateMsg st = {true, "OFF", "OFF", "OFF", "OFF"};
-  float fl = 0, fr = 0, f1 = 0, f2 = 0;
+  float f1 = 0, f2 = 0;   // filtered STATIC currents; arrows are intent-echo, unmeasured
   unsigned long lastRead = 0;
 
   bool pwrCandidate = true;      // debounce: the value we are counting towards
@@ -589,9 +589,7 @@ void SensorTask(void* parameter) {
         pwrCandidateCount = 0;    // reading agrees with committed state; reset
       }
 
-      // ---- Currents ----
-      float cl = readCurrent(PIN_CURR_LEFT, ZERO_LEFT, SENS_LEFT);
-      float cr = readCurrent(PIN_CURR_RGHT, ZERO_RGHT, SENS_RGHT);
+      // ---- Static-zone currents (arrows are intent-echo, not measured) ----
       float c1 = readCurrent(PIN_CURR_STA1, ZERO_STA1, SENS_STA1);
       float c2 = readCurrent(PIN_CURR_STA2, ZERO_STA2, SENS_STA2);
 
@@ -599,33 +597,41 @@ void SensorTask(void* parameter) {
       unsigned long mc = lastModeChangeMs;
       if (mc != seenModeChange) {
         seenModeChange = mc;
-        fl = cl; fr = cr; f1 = c1; f2 = c2;
+        f1 = c1; f2 = c2;
       } else {
-        fl = (cl < NOISE_FLOOR) ? 0 : (cl * ALPHA) + (fl * (1 - ALPHA));
-        fr = (cr < NOISE_FLOOR) ? 0 : (cr * ALPHA) + (fr * (1 - ALPHA));
         f1 = (c1 < NOISE_FLOOR) ? 0 : (c1 * ALPHA) + (f1 * (1 - ALPHA));
         f2 = (c2 < NOISE_FLOOR) ? 0 : (c2 * ALPHA) + (f2 * (1 - ALPHA));
       }
 
-      // Still physically settling — publish nothing about the currents yet.
-      if (millis() - mc < MODE_SETTLE_MS) {
-        if (changed) xQueueOverwrite(sensorQueue, &st);
-        vTaskDelay(pdMS_TO_TICKS(10));
-        continue;
+      /*
+       * ARROWS — intent-echo, evaluated every cycle. This is NOT a measurement,
+       * so it needs no filtering and no settle window.
+       *
+       * At 2-strip chase current the 5A ACS712's signal (~40 ADC counts) sits
+       * inside its own noise, so a measured 4-state verdict is unreliable and
+       * false-alarms both ways (FAIL_SHORT when off, FAIL_OPEN when chasing). We
+       * therefore report only what this side was COMMANDED to do — "ON"/"OFF",
+       * never FAIL_*. Genuine arrow health is deferred to the Phase-3 scheduled
+       * all-on self-test, where 5 lit strips (~5x the current) clear the noise.
+       */
+      const char* sl = expectLeftOn  ? "ON" : "OFF";
+      const char* sr = expectRightOn ? "ON" : "OFF";
+      if (strcmp(st.state_left, sl) || strcmp(st.state_right, sr)) {
+        st.state_left = sl; st.state_right = sr;
+        changed = true;
       }
 
-      const char* sl = getDiscrepancyState(expectLeftOn,  fl, dynamicThreshLeft);
-      const char* sr = getDiscrepancyState(expectRightOn, fr, dynamicThreshRight);
-      // Static zones are hardwired always-on: forever expected ON, fixed threshold.
-      // Their only legal states are ON and FAIL_OPEN.
-      const char* s1 = getDiscrepancyState(true, f1, THRESHOLD_STATIC);
-      const char* s2 = getDiscrepancyState(true, f2, THRESHOLD_STATIC);
-
-      if (strcmp(st.state_left, sl) || strcmp(st.state_right, sr) ||
-          strcmp(st.state_sta1, s1) || strcmp(st.state_sta2, s2)) {
-        st.state_left = sl; st.state_right = sr;
-        st.state_sta1 = s1; st.state_sta2 = s2;
-        changed = true;
+      // Static zones ARE measured (they draw enough current to be reliable), but
+      // their verdict is held while the load physically settles after a mode
+      // change — an arrow side switching briefly perturbs the shared supply.
+      // Hardwired always-on: forever expected ON. Only ON and FAIL_OPEN are legal.
+      if (millis() - mc >= MODE_SETTLE_MS) {
+        const char* s1 = getDiscrepancyState(true, f1, THRESHOLD_STATIC);
+        const char* s2 = getDiscrepancyState(true, f2, THRESHOLD_STATIC);
+        if (strcmp(st.state_sta1, s1) || strcmp(st.state_sta2, s2)) {
+          st.state_sta1 = s1; st.state_sta2 = s2;
+          changed = true;
+        }
       }
 
       if (!haveSensorData) { haveSensorData = true; changed = true; }
@@ -657,13 +663,15 @@ void readSensorsVerbose() {
   float vl = (rl / 4095.0f) * ADC_REF, vr = (rr / 4095.0f) * ADC_REF;
   float v1 = (r1 / 4095.0f) * ADC_REF, v2 = (r2 / 4095.0f) * ADC_REF;
 
+  // Arrows: raw ADC/volts/amps still shown for bench observation, but the STATE
+  // column is the published intent-echo (see SensorTask) — never a FAIL verdict.
   Serial.println(F("\n  CH     rawADC   volts    amps    thresh   state"));
-  Serial.printf("  LEFT   %5d   %.4f  %.4f  %.4f  %s\n", rl, vl,
+  Serial.printf("  LEFT   %5d   %.4f  %.4f  %.4f  %s (intent)\n", rl, vl,
                 fabs((vl - ZERO_LEFT) / SENS_LEFT), dynamicThreshLeft,
-                getDiscrepancyState(expectLeftOn, fabs((vl - ZERO_LEFT) / SENS_LEFT), dynamicThreshLeft));
-  Serial.printf("  RGHT   %5d   %.4f  %.4f  %.4f  %s\n", rr, vr,
+                expectLeftOn ? "ON" : "OFF");
+  Serial.printf("  RGHT   %5d   %.4f  %.4f  %.4f  %s (intent)\n", rr, vr,
                 fabs((vr - ZERO_RGHT) / SENS_RGHT), dynamicThreshRight,
-                getDiscrepancyState(expectRightOn, fabs((vr - ZERO_RGHT) / SENS_RGHT), dynamicThreshRight));
+                expectRightOn ? "ON" : "OFF");
   Serial.printf("  STA1   %5d   %.4f  %.4f  %.4f  %s\n", r1, v1,
                 fabs((v1 - ZERO_STA1) / SENS_STA1), THRESHOLD_STATIC,
                 getDiscrepancyState(true, fabs((v1 - ZERO_STA1) / SENS_STA1), THRESHOLD_STATIC));
