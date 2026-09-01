@@ -1,0 +1,177 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+  <style>
+    :root{
+      --bg:#eef1f5; --panel:#ffffff; --elev:#f4f7fa; --border:#dce1e8;
+      --text:#182029; --dim:#5c6672; --faint:#93a0ac;
+      --accent:#0a8fa6; --accent-bg:rgba(10,143,166,0.10);
+      --ok:#1f9d52; --ok-bg:rgba(31,157,82,0.10); --ok-bd:rgba(31,157,82,0.32);
+      --warn:#bf7c08; --warn-bg:rgba(191,124,8,0.12); --warn-bd:rgba(191,124,8,0.34);
+      --fault:#d83a34; --fault-bg:rgba(216,58,52,0.10); --fault-bd:rgba(216,58,52,0.32);
+      --off:#8b98a6; --off-bg:rgba(139,152,166,0.14); --off-bd:rgba(139,152,166,0.36);
+      --zebra:rgba(15,23,42,0.022);
+    }
+    *{box-sizing:border-box;}
+    body{margin:0;}
+    a{color:var(--accent);text-decoration:none;} a:hover{color:var(--text);}
+    .app{width:1280px;height:800px;background:var(--bg);color:var(--text);
+      font-family:'IBM Plex Sans',system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden;}
+
+    .topbar{height:60px;flex:0 0 60px;display:flex;align-items:center;gap:22px;
+      padding:0 22px;background:var(--panel);border-bottom:1px solid var(--border);}
+    .brand{display:flex;align-items:center;gap:11px;}
+    .brand-mark{width:24px;height:24px;color:var(--accent);}
+    .brand-name{font-weight:700;font-size:14px;letter-spacing:0.15em;}
+    .brand-sub{font-size:10px;color:var(--dim);letter-spacing:0.18em;margin-top:2px;}
+    .nav{display:flex;gap:2px;margin-left:6px;}
+    .nav a{padding:8px 15px;border-radius:7px;font-size:13px;font-weight:500;color:var(--dim);}
+    .nav a.active{background:var(--accent-bg);color:var(--accent);}
+    .spacer{flex:1;}
+    .pill{display:flex;align-items:center;gap:9px;background:var(--elev);border:1px solid var(--border);
+      border-radius:999px;padding:7px 15px;font-size:12.5px;font-weight:500;}
+    .pill .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);}
+    .pill b{font-family:'IBM Plex Mono';}
+    .clock{font-family:'IBM Plex Mono';font-size:13px;color:var(--dim);}
+    .gear{width:20px;height:20px;color:var(--dim);}
+
+    .toolbar{display:flex;align-items:center;gap:16px;padding:18px 24px 16px;}
+    .search{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);
+      border-radius:9px;padding:11px 14px;width:340px;color:var(--dim);font-size:13px;}
+    .search svg{color:var(--faint);flex:0 0 auto;}
+
+    .ctl{margin-left:auto;display:flex;align-items:center;gap:14px;}
+    .ctl-lbl{text-align:right;line-height:1.35;}
+    .ctl-lbl .t1{font-size:10px;color:var(--dim);letter-spacing:0.14em;}
+    .ctl-lbl .t2{font-size:11px;color:var(--faint);}
+    .seg{display:flex;background:var(--elev);border:1px solid var(--border);border-radius:11px;padding:4px;gap:4px;}
+    .seg .opt{display:flex;flex-direction:column;align-items:center;gap:1px;padding:8px 18px;border-radius:8px;
+      font-size:13px;font-weight:600;color:var(--dim);}
+    .seg .opt small{font-size:9.5px;font-weight:500;letter-spacing:0.1em;opacity:0.85;}
+    .seg .opt.on{background:var(--accent-bg);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-bd,transparent);}
+
+    .tblwrap{flex:1;margin:0 24px;background:var(--panel);border:1px solid var(--border);border-radius:12px;
+      overflow:hidden;display:flex;flex-direction:column;min-height:0;}
+    .thead,.trow{display:grid;grid-template-columns:1.3fr 1.7fr 1fr 1.2fr;gap:16px;align-items:center;padding:13px 22px;}
+    .thead{border-bottom:1px solid var(--border);font-size:10.5px;letter-spacing:0.14em;color:var(--dim);background:var(--elev);}
+    .trow{border-bottom:1px solid var(--border);font-size:13.5px;}
+    .trow:nth-child(even){background:var(--zebra);}
+    .cell-id{font-family:'IBM Plex Mono';font-weight:600;}
+    .cell-ip,.cell-reg{font-family:'IBM Plex Mono';color:var(--dim);}
+    .stat{display:flex;align-items:center;gap:9px;font-weight:600;font-size:12.5px;}
+    .stat .sd{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+    .s-ok{color:var(--ok);} .s-ok .sd{background:var(--ok);}
+    .s-warn{color:var(--warn);} .s-warn .sd{background:var(--warn);}
+    .s-fault{color:var(--fault);} .s-fault .sd{background:var(--fault);}
+    .s-off{color:var(--off);} .s-off .sd{background:var(--off);}
+
+    .tfoot{display:flex;align-items:center;gap:14px;padding:16px 24px;}
+    .pginfo{font-family:'IBM Plex Mono';font-size:12.5px;color:var(--dim);}
+    .pgbtns{margin-left:auto;display:flex;gap:10px;}
+    .pgbtn{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:9px 18px;
+      font-size:12.5px;font-weight:600;color:var(--text);}
+    .pgbtn.dis{color:var(--faint);}
+  </style>
+</helmet>
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l5 5-5 5"/><path d="M12 7l5 5-5 5"/></svg>
+      <div>
+        <div class="brand-name">METRO SIGNAGE</div>
+        <div class="brand-sub">FLEET CONTROL</div>
+      </div>
+    </div>
+    <div class="nav">
+      <a href="#">Fleet Overview</a>
+      <a class="active" href="#">Signage List</a>
+      <a href="#">Diagnostics</a>
+    </div>
+    <div class="spacer"></div>
+    <div class="pill"><span class="dot"></span><b>87</b> / 100 ONLINE</div>
+    <div class="clock">09:42</div>
+    <svg class="gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </div>
+
+  <div class="toolbar">
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      Search node ID or IP address…
+    </div>
+    <div class="ctl">
+      <div class="ctl-lbl">
+        <div class="t1">CONTROL SOURCE</div>
+        <div class="t2">governs all 100 nodes</div>
+      </div>
+      <div class="seg">
+        <div class="opt on">REMOTE<small>SCADA · AUTO</small></div>
+        <div class="opt">LOCAL<small>HMI · MANUAL</small></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tblwrap">
+    <div class="thead">
+      <div>NODE ID</div><div>IP ADDRESS</div><div>REGISTER</div><div>STATUS</div>
+    </div>
+    <sc-for list="{{rows}}" as="r" hint-placeholder-count="14">
+      <div class="trow">
+        <div class="cell-id">{{r.id}}</div>
+        <div class="cell-ip">{{r.ip}}</div>
+        <div class="cell-reg">{{r.reg}}</div>
+        <div class="stat {{r.scls}}"><span class="sd"></span>{{r.word}}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div class="tfoot">
+    <div class="pginfo">Showing 1–14 of 100</div>
+    <div class="pgbtns">
+      <div class="pgbtn dis">‹ Prev</div>
+      <div class="pgbtn">Next ›</div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const map = { ok: ['s-ok','OK'], warn: ['s-warn','WARNING'], fault: ['s-fault','FAULT'], off: ['s-off','OFFLINE'] };
+    const src = [
+      { n: 1,  ip: '10.20.7.11', st: 'ok' },
+      { n: 2,  ip: '10.20.7.12', st: 'ok' },
+      { n: 3,  ip: '—',          st: 'off' },
+      { n: 4,  ip: '10.20.7.14', st: 'ok' },
+      { n: 5,  ip: '10.20.7.15', st: 'warn' },
+      { n: 6,  ip: '10.20.7.16', st: 'ok' },
+      { n: 7,  ip: '10.20.7.17', st: 'ok' },
+      { n: 8,  ip: '10.20.7.18', st: 'ok' },
+      { n: 9,  ip: '10.20.7.19', st: 'ok' },
+      { n: 10, ip: '10.20.7.20', st: 'ok' },
+      { n: 11, ip: '10.20.7.21', st: 'ok' },
+      { n: 12, ip: '—',          st: 'off' },
+      { n: 13, ip: '10.20.7.23', st: 'ok' },
+      { n: 14, ip: '10.20.7.24', st: 'fault' },
+    ];
+    const rows = src.map((r) => ({
+      id: 'ND-' + (8090 + r.n),
+      ip: r.ip,
+      reg: String(40000 + r.n),
+      scls: map[r.st][0],
+      word: map[r.st][1],
+    }));
+    return { rows };
+  }
+}
+</script>
+</body>
+</html>

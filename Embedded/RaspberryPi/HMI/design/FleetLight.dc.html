@@ -1,0 +1,184 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+  <style>
+    :root{
+      --bg:#eef1f5; --panel:#ffffff; --elev:#f4f7fa; --border:#dce1e8;
+      --text:#182029; --dim:#5c6672; --faint:#93a0ac;
+      --accent:#0a8fa6; --accent-bg:rgba(10,143,166,0.10);
+      --ok:#1f9d52; --ok-bg:rgba(31,157,82,0.10); --ok-bd:rgba(31,157,82,0.32);
+      --warn:#bf7c08; --warn-bg:rgba(191,124,8,0.12); --warn-bd:rgba(191,124,8,0.34);
+      --fault:#d83a34; --fault-bg:rgba(216,58,52,0.10); --fault-bd:rgba(216,58,52,0.32);
+      --off:#8b98a6; --off-bg:rgba(139,152,166,0.14); --off-bd:rgba(139,152,166,0.36);
+    }
+    *{box-sizing:border-box;}
+    body{margin:0;}
+    a{color:var(--accent);text-decoration:none;} a:hover{color:var(--text);}
+    .app{width:1280px;height:800px;background:var(--bg);color:var(--text);
+      font-family:'IBM Plex Sans',system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden;}
+    .mono{font-family:'IBM Plex Mono',ui-monospace,monospace;}
+
+    .topbar{height:60px;flex:0 0 60px;display:flex;align-items:center;gap:22px;
+      padding:0 22px;background:var(--panel);border-bottom:1px solid var(--border);}
+    .brand{display:flex;align-items:center;gap:11px;}
+    .brand-mark{width:24px;height:24px;color:var(--accent);}
+    .brand-name{font-weight:700;font-size:14px;letter-spacing:0.15em;}
+    .brand-sub{font-size:10px;color:var(--dim);letter-spacing:0.18em;margin-top:2px;}
+    .nav{display:flex;gap:2px;margin-left:6px;}
+    .nav a{padding:8px 15px;border-radius:7px;font-size:13px;font-weight:500;color:var(--dim);}
+    .nav a.active{background:var(--accent-bg);color:var(--accent);}
+    .spacer{flex:1;}
+    .pill{display:flex;align-items:center;gap:9px;background:var(--elev);border:1px solid var(--border);
+      border-radius:999px;padding:7px 15px;font-size:12.5px;font-weight:500;}
+    .pill .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);}
+    .pill b{font-family:'IBM Plex Mono';}
+    .clock{font-family:'IBM Plex Mono';font-size:13px;color:var(--dim);}
+    .gear{width:20px;height:20px;color:var(--dim);}
+
+    .body{flex:1;display:flex;min-height:0;}
+    .content{flex:1;display:flex;flex-direction:column;padding:20px 22px;min-width:0;}
+    .h-row{display:flex;align-items:center;gap:26px;margin-bottom:16px;}
+    .big-num{font-family:'IBM Plex Mono';font-size:36px;font-weight:600;line-height:1;}
+    .big-num span{color:var(--dim);font-size:21px;}
+    .big-lbl{font-size:11px;color:var(--dim);letter-spacing:0.16em;margin-top:7px;}
+    .chips{display:flex;gap:10px;margin-left:auto;}
+    .chip{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--border);
+      border-radius:9px;padding:9px 14px;}
+    .chip .cdot{width:9px;height:9px;border-radius:2px;}
+    .chip b{font-family:'IBM Plex Mono';font-size:16px;font-weight:600;}
+    .chip .cl{font-size:10px;color:var(--dim);letter-spacing:0.12em;margin-top:2px;}
+
+    .grid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:8px;flex:1;min-height:0;align-content:stretch;}
+    .tile{border-radius:8px;border:1px solid var(--border);background:var(--panel);
+      padding:7px 8px 6px;display:flex;flex-direction:column;justify-content:space-between;min-height:0;}
+    .tile-num{font-family:'IBM Plex Mono';font-weight:600;font-size:15px;line-height:1;}
+    .tile-id{font-family:'IBM Plex Mono';font-size:9px;color:var(--faint);letter-spacing:0.01em;}
+    .t-ok{background:var(--ok-bg);border-color:var(--ok-bd);} .t-ok .tile-num{color:var(--ok);}
+    .t-warn{background:var(--warn-bg);border-color:var(--warn-bd);} .t-warn .tile-num{color:var(--warn);}
+    .t-fault{background:var(--fault-bg);border-color:var(--fault-bd);} .t-fault .tile-num{color:var(--fault);}
+    .t-off{background:var(--off-bg);border-color:var(--off-bd);} .t-off .tile-num{color:var(--off);} .t-off .tile-id{color:var(--off);}
+
+    .rail{width:344px;flex:0 0 344px;background:var(--panel);border-left:1px solid var(--border);
+      display:flex;flex-direction:column;min-height:0;}
+    .rail-hd{display:flex;align-items:center;gap:10px;padding:18px 20px 15px;border-bottom:1px solid var(--border);}
+    .rail-hd .ttl{font-size:12.5px;font-weight:600;letter-spacing:0.14em;}
+    .badge{margin-left:auto;background:var(--fault-bg);color:var(--fault);border:1px solid var(--fault-bd);
+      border-radius:999px;font-family:'IBM Plex Mono';font-size:12px;padding:2px 10px;font-weight:600;}
+    .alarms{flex:1;overflow:hidden;padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
+    .alarm{display:flex;align-items:center;gap:12px;background:var(--elev);border:1px solid var(--border);
+      border-left-width:3px;border-radius:8px;padding:11px 13px;}
+    .a-fault{border-left-color:var(--fault);} .a-warn{border-left-color:var(--warn);} .a-off{border-left-color:var(--off);}
+    .adot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+    .d-fault{background:var(--fault);} .d-warn{background:var(--warn);} .d-off{background:var(--off);}
+    .ainfo{flex:1;min-width:0;}
+    .aid{font-family:'IBM Plex Mono';font-size:13px;font-weight:600;}
+    .acause{font-size:11.5px;color:var(--dim);margin-top:2px;}
+    .atime{font-family:'IBM Plex Mono';font-size:11px;color:var(--faint);}
+  </style>
+</helmet>
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l5 5-5 5"/><path d="M12 7l5 5-5 5"/></svg>
+      <div>
+        <div class="brand-name">METRO SIGNAGE</div>
+        <div class="brand-sub">FLEET CONTROL</div>
+      </div>
+    </div>
+    <div class="nav">
+      <a class="active" href="#">Fleet Overview</a>
+      <a href="#">Signage List</a>
+      <a href="#">Diagnostics</a>
+    </div>
+    <div class="spacer"></div>
+    <div class="pill"><span class="dot"></span><b>87</b> / 100 ONLINE</div>
+    <div class="clock">09:42</div>
+    <svg class="gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </div>
+
+  <div class="body">
+    <div class="content">
+      <div class="h-row">
+        <div>
+          <div class="big-num">87<span> / 100</span></div>
+          <div class="big-lbl">NODES ONLINE</div>
+        </div>
+        <div class="chips">
+          <div class="chip"><span class="cdot" style="background:var(--ok)"></span><div><b>74</b><div class="cl">HEALTHY</div></div></div>
+          <div class="chip"><span class="cdot" style="background:var(--warn)"></span><div><b>9</b><div class="cl">WARNING</div></div></div>
+          <div class="chip"><span class="cdot" style="background:var(--fault)"></span><div><b>4</b><div class="cl">FAULT</div></div></div>
+          <div class="chip"><span class="cdot" style="background:var(--off)"></span><div><b>13</b><div class="cl">OFFLINE</div></div></div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <sc-for list="{{tiles}}" as="t" hint-placeholder-count="100">
+          <div class="tile {{t.cls}}">
+            <div class="tile-num">{{t.num}}</div>
+            <div class="tile-id">{{t.id}}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="rail-hd">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--fault)"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span class="ttl">ACTIVE ALARMS</span>
+        <span class="badge">13</span>
+      </div>
+      <div class="alarms">
+        <sc-for list="{{alarms}}" as="al" hint-placeholder-count="8">
+          <div class="alarm {{al.sev}}">
+            <span class="adot {{al.dot}}"></span>
+            <div class="ainfo">
+              <div class="aid">{{al.id}}</div>
+              <div class="acause">{{al.cause}}</div>
+            </div>
+            <div class="atime">{{al.time}}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const fault = [14,47,68,91];
+    const warn = [5,23,31,52,59,74,80,88,96];
+    const off = [3,12,19,27,35,42,55,63,71,77,84,93,99];
+    const clsOf = (n) => fault.includes(n) ? 't-fault'
+                       : warn.includes(n)  ? 't-warn'
+                       : off.includes(n)   ? 't-off' : 't-ok';
+    const tiles = [];
+    for (let n = 1; n <= 100; n++) {
+      tiles.push({ num: String(n).padStart(2, '0'), id: 'ND-' + (8090 + n), cls: clsOf(n) });
+    }
+    const alarms = [
+      { sev: 'a-fault', dot: 'd-fault', id: 'ND-8104', cause: 'FAIL_OPEN · LHS Arrows',    time: '09:42:11' },
+      { sev: 'a-fault', dot: 'd-fault', id: 'ND-8137', cause: 'FAIL_SHORT · Static Zone 1', time: '09:39:02' },
+      { sev: 'a-fault', dot: 'd-fault', id: 'ND-8158', cause: 'Cannot verify outputs',          time: '09:35:47' },
+      { sev: 'a-fault', dot: 'd-fault', id: 'ND-8181', cause: 'FAIL_OPEN · RHS Arrows',     time: '09:33:20' },
+      { sev: 'a-warn',  dot: 'd-warn',  id: 'ND-8095', cause: 'Commanded ≠ Actual',         time: '09:41:30' },
+      { sev: 'a-warn',  dot: 'd-warn',  id: 'ND-8113', cause: 'Latched · SOLID-ALL',        time: '09:40:12' },
+      { sev: 'a-warn',  dot: 'd-warn',  id: 'ND-8121', cause: 'Latched · SOLID-LEFT',       time: '09:38:55' },
+      { sev: 'a-warn',  dot: 'd-warn',  id: 'ND-8142', cause: 'Commanded ≠ Actual',         time: '09:37:10' },
+      { sev: 'a-off',   dot: 'd-off',   id: 'ND-8093', cause: 'Node OFFLINE',                    time: '09:30:02' },
+    ];
+    return { tiles, alarms };
+  }
+}
+</script>
+</body>
+</html>

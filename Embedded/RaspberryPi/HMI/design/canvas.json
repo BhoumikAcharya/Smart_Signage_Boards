@@ -1,0 +1,14 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html",        "title": "Fleet Overview · Dark",  "x": 0,    "y": 0,   "w": 1280, "h": 800 },
+    { "file": "SignageDark.dc.html", "title": "Signage List · Dark",    "x": 1360, "y": 0,   "w": 1280, "h": 800 },
+    { "file": "FleetLight.dc.html",  "title": "Fleet Overview · Light", "x": 0,    "y": 920, "w": 1280, "h": 800 },
+    { "file": "SignageLight.dc.html","title": "Signage List · Light",   "x": 1360, "y": 920, "w": 1280, "h": 800 }
+  ],
+  "annotations": [
+    { "id": "brief",       "x": 0, "y": -168, "w": 620, "text": "First pass — Fleet Overview + Signage List, in dark and light.\n\"Control Room\" direction: IBM Plex Sans/Mono, cyan accent, green/amber/red/grey status language. React to this and we'll fan out palettes and add the Node page, per-LED popup, and Diagnostics." },
+    { "id": "dark-label",  "x": 0, "y": -44,  "w": 260, "text": "DARK THEME" },
+    { "id": "light-label", "x": 0, "y": 872,  "w": 260, "text": "LIGHT THEME" }
+  ],
+  "launch": { "view": "canvas" }
+}
