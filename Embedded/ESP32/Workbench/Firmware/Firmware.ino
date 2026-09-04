@@ -755,6 +755,16 @@ void setup() {
   client.setServer(mqtt_server_ip, mqtt_port);
   client.setCallback(callback);
 
+  /*
+   * BOUND THE BLOCKING. PubSubClient's default socket timeout is 15 s — the same
+   * as our task watchdog. On an Ethernet flap, client.connect() (waiting for
+   * CONNACK) or client.loop() (waiting for the rest of a half-arrived packet)
+   * can stall in loop() for the full 15 s, starving esp_task_wdt_reset() and
+   * tripping the WDT -> reboot. 2 s is well under the 15 s WDT and far longer
+   * than a healthy LAN round-trip, so a stall self-clears instead of panicking.
+   */
+  client.setSocketTimeout(2);
+
   // MCP second, non-fatal.
   Wire.begin(I2C_SDA, I2C_SCL);
   Serial.print(F("\nProbing MCP23017 @0x20 on SDA=4/SCL=13 ... "));
