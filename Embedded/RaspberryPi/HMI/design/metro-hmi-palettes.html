@@ -1,4 +1,5 @@
-﻿<!doctype html><html><head><meta charset="utf-8">
+﻿<meta charset="utf-8">
+<title>HMI Accent Palettes</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <style>
   :root{
@@ -267,24 +268,39 @@
   .pingcard .pc{font-size:11.5px;color:var(--dim);margin:9px auto 18px;max-width:40ch;line-height:1.55;}
   .pingbtn{border:1px solid var(--accent-bd);background:var(--accent);color:var(--on-accent);border-radius:10px;padding:13px 32px;font-size:14px;font-weight:700;cursor:pointer;}
 
-/* ---- print layout ---- */
-@page { size: 1280px 800px; margin: 0; }
-html, body { margin: 0; padding: 0; background: #ffffff; }
-* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.page { width: 1280px; height: 800px; overflow: hidden; position: relative; break-after: page; }
-.page:last-child { break-after: auto; }
-</style></head><body>
-<div id="root"></div>
-<script>
-(function(){
-  var theme = (location.hash.replace("#","") || "dark");
-  var cls = theme === "light" ? "theme-light" : "theme-dark";
-  var apps = ["fleet","signage","node","popup","diag"];
-  document.getElementById("root").innerHTML = apps.map(function(a){
-    return '<div class="page"><div class="frame '+cls+'"><div class="app" data-app="'+a+'"></div></div></div>';
-  }).join("");
-})();
-</script>
+/* ---- accent variants (override only accent tokens, on the dark base) ---- */
+.acc-cyan   { --accent:#2ad4e6; --accent-bg:rgba(42,212,230,0.12);  --accent-bd:rgba(42,212,230,0.42);  --on-accent:#04191d; }
+.acc-azure  { --accent:#3b9bff; --accent-bg:rgba(59,155,255,0.14);  --accent-bd:rgba(59,155,255,0.42);  --on-accent:#04121f; }
+.acc-violet { --accent:#a480ff; --accent-bg:rgba(164,128,255,0.15); --accent-bd:rgba(164,128,255,0.44); --on-accent:#140a24; }
+.acc-steel  { --accent:#7f9bbf; --accent-bg:rgba(127,155,191,0.16); --accent-bd:rgba(127,155,191,0.46); --on-accent:#0b1017; }
+</style><div class="wrap">
+  <header class="page-head">
+    <p class="page-eyebrow">Design exploration · accent options</p>
+    <h1 class="page-title">Choose an accent</h1>
+    <p class="page-lede">The same Node Detail screen — the most accent-rich view — in four directions, all on the dark theme so only the accent changes. The status language (green / amber / red / grey) stays fixed in every option because those colors carry meaning. Pick one and I'll apply it across all five screens, in both themes.</p>
+    <p class="page-note">accent appears on: nav highlight · node chips · control-source band · commanded values · active mode · links</p>
+  </header>
+
+  <section class="screen">
+    <div class="screen-label"><span class="n">A</span><span class="t">Cyan &nbsp;·&nbsp; current</span><span class="th">#2AD4E6</span></div>
+    <div class="scroll"><div class="frame theme-dark acc-cyan"><div class="app" data-app="node"></div></div></div>
+  </section>
+
+  <section class="screen">
+    <div class="screen-label"><span class="n">B</span><span class="t">Azure</span><span class="th">#3B9BFF</span></div>
+    <div class="scroll"><div class="frame theme-dark acc-azure"><div class="app" data-app="node"></div></div></div>
+  </section>
+
+  <section class="screen">
+    <div class="screen-label"><span class="n">C</span><span class="t">Violet</span><span class="th">#A480FF</span></div>
+    <div class="scroll"><div class="frame theme-dark acc-violet"><div class="app" data-app="node"></div></div></div>
+  </section>
+
+  <section class="screen">
+    <div class="screen-label"><span class="n">D</span><span class="t">Steel &nbsp;·&nbsp; muted</span><span class="th">#7F9BBF</span></div>
+    <div class="scroll"><div class="frame theme-dark acc-steel"><div class="app" data-app="node"></div></div></div>
+  </section>
+</div>
 <script>
 (function(){
   const GEAR = '<svg class="gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
@@ -507,4 +523,3 @@ html, body { margin: 0; padding: 0; background: #ffffff; }
 })();
 
 </script>
-</body></html>

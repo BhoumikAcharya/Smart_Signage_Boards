@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --ink:#1b2027; --ink-soft:#39424d; --muted:#69737f; --faint:#9aa4b0;
+    --rule:#e4e8ee; --rule-soft:#eef1f5;
+    --accent:#0a8fa6; --accent-deep:#086b7d; --accent-soft:#e7f4f6;
+    --paper:#ffffff; --panel:#f7f9fb;
+    --ok:#1f9d52; --warn:#c6810b; --fault:#d83a34; --off:#93a0ad;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:var(--paper); }
+  body{ font-family:'IBM Plex Sans',system-ui,sans-serif; color:var(--ink);
+    font-size:15px; line-height:1.62; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .mono{ font-family:'IBM Plex Mono',ui-monospace,monospace; }
+
+  @page{ size:A4; margin:20mm 18mm 20mm; }
+  .docfoot{ position:fixed; left:0; right:0; bottom:9mm; padding:0 18mm;
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:8.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--faint); }
+
+  .title-block{ border-top:3px solid var(--accent); padding-top:22px; margin-bottom:30px; }
+  .eyebrow{ font-family:'IBM Plex Mono'; font-size:11px; letter-spacing:0.24em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 14px; }
+  h1{ font-size:31px; font-weight:700; letter-spacing:-0.015em; line-height:1.12; margin:0 0 12px; text-wrap:balance; }
+  .subtitle{ font-size:15px; color:var(--muted); margin:0 0 20px; max-width:60ch; }
+  .meta{ display:flex; gap:26px; flex-wrap:wrap; padding-top:16px; border-top:1px solid var(--rule);
+    font-family:'IBM Plex Mono'; font-size:11px; color:var(--muted); }
+  .meta b{ color:var(--ink); font-weight:600; }
+
+  .lead{ font-size:15.5px; color:var(--ink-soft); margin:0 0 22px; }
+  .lead strong{ color:var(--ink); font-weight:600; }
+
+  h2{ font-size:19px; font-weight:700; letter-spacing:-0.01em; margin:30px 0 6px;
+    padding-bottom:9px; border-bottom:1px solid var(--rule); break-after:avoid; }
+  h3{ font-family:'IBM Plex Mono'; font-size:11px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--accent-deep); margin:16px 0 9px; break-after:avoid; }
+  p{ margin:0 0 12px; }
+  .k{ color:var(--muted); }
+
+  ul{ margin:0 0 12px; padding-left:0; list-style:none; }
+  li{ position:relative; padding-left:20px; margin-bottom:7px; }
+  li::before{ content:""; position:absolute; left:3px; top:9px; width:6px; height:6px; border-radius:2px; background:var(--accent); }
+  li b{ font-weight:600; }
+
+  /* Accent option cards */
+  .cards{ display:flex; flex-direction:column; gap:14px; margin:8px 0 6px; }
+  .card{ display:flex; gap:0; border:1px solid var(--rule); border-radius:12px; overflow:hidden; break-inside:avoid; }
+  .card .chip{ flex:0 0 168px; display:flex; flex-direction:column; justify-content:flex-end; padding:14px;
+    color:#fff; }
+  .card .chip .letter{ font-family:'IBM Plex Mono'; font-size:12px; opacity:0.8; }
+  .card .chip .cname{ font-size:20px; font-weight:700; letter-spacing:-0.01em; }
+  .card .chip .chex{ font-family:'IBM Plex Mono'; font-size:12px; opacity:0.9; margin-top:2px; }
+  .card .body{ flex:1; padding:15px 18px; }
+  .card .body .desc{ font-size:13.5px; color:var(--ink-soft); margin:0 0 12px; }
+  .card .body .desc b{ color:var(--ink); font-weight:600; }
+  .tokens{ display:flex; gap:8px; flex-wrap:wrap; }
+  .tok{ display:flex; align-items:center; gap:7px; border:1px solid var(--rule); border-radius:7px;
+    padding:5px 9px; font-family:'IBM Plex Mono'; font-size:10.5px; color:var(--muted); }
+  .tok .b{ width:13px; height:13px; border-radius:4px; flex:0 0 auto; }
+  .tok .b.bd{ background:transparent; }
+
+  /* Swatch row for status / neutrals */
+  .swrow{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:6px 0 14px; break-inside:avoid; }
+  .swatch{ border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
+  .swatch .fill{ height:52px; }
+  .swatch .cap{ padding:9px 11px; }
+  .swatch .cap .nm{ font-size:12.5px; font-weight:600; }
+  .swatch .cap .hx{ font-family:'IBM Plex Mono'; font-size:10.5px; color:var(--muted); }
+  .swatch .cap .use{ font-size:10.5px; color:var(--muted); margin-top:3px; line-height:1.35; }
+
+  .callout{ border:1px solid var(--rule); border-left:3px solid var(--accent); border-radius:8px;
+    background:var(--accent-soft); padding:14px 16px; margin:12px 0; break-inside:avoid; }
+  .callout .ct{ font-family:'IBM Plex Mono'; font-size:10px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--accent-deep); margin:0 0 8px; }
+  .callout p{ margin:0; font-size:13.5px; color:var(--ink-soft); }
+
+  .two{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .theme-card{ border:1px solid var(--rule); border-radius:12px; overflow:hidden; break-inside:avoid; }
+  .theme-card .band{ height:64px; display:flex; align-items:center; padding:0 16px;
+    font-family:'IBM Plex Mono'; font-size:12px; letter-spacing:0.1em; }
+  .theme-card .tc-body{ padding:12px 14px; }
+  .theme-card .tc-body .tt{ font-size:13px; font-weight:600; margin-bottom:6px; }
+  .theme-card .tc-body .row{ display:flex; justify-content:space-between; font-family:'IBM Plex Mono';
+    font-size:10.5px; color:var(--muted); padding:2px 0; }
+</style>
+</head>
+<body>
+
+<div class="docfoot"><span>Metro Signage HMI · Accent Palette Guide</span><span>Confidential · Design</span></div>
+
+<div class="title-block">
+  <p class="eyebrow">Visual Style</p>
+  <h1>Accent Palette Options</h1>
+  <p class="subtitle">Four accent directions for the HMI, the fixed status colours they sit alongside, and the reasoning behind each choice.</p>
+  <div class="meta">
+    <span>Options <b>4</b></span>
+    <span>September <b>2026</b></span>
+    <span>Base <b>“Control Room”</b></span>
+    <span>Themes <b>Dark + Light</b></span>
+  </div>
+</div>
+
+<p class="lead">The interface uses a single <strong>accent colour</strong> for everything interactive and selected — the active navigation tab, the control-source toggle, selected modes, links, values, and the LED glow. Everything else is either a neutral or one of the fixed <strong>status colours</strong>. Choosing the accent is therefore the one colour decision that sets the personality of the whole product, which is why it is presented on its own.</p>
+
+<div class="callout">
+  <p class="ct">Two rules the accent must respect</p>
+  <p>First, the accent stays clearly distinct from the status language (green / amber / red / grey) so “this is interactive” never reads as “this is a warning.” Second — and for exactly that reason — <b>amber is not offered as an accent</b>: it is already the warning colour. All four options therefore sit on the cool side of the wheel.</p>
+</div>
+
+<h2>The four options</h2>
+<p class="k">Shown against the dark theme, where an accent reads most strongly. Each option lists its solid value plus the translucent fill and border tints derived from it.</p>
+
+<div class="cards">
+
+  <div class="card">
+    <div class="chip" style="background:#2ad4e6;color:#04191d"><span class="letter">Option A</span><span class="cname">Cyan</span><span class="chex">#2AD4E6 · current</span></div>
+    <div class="body">
+      <p class="desc"><b>Cool, technical, instrument-like.</b> The current direction. Reads as classic control-room / SCADA and pairs naturally with the charcoal ground. The safest, most expected choice for this domain.</p>
+      <div class="tokens">
+        <span class="tok"><span class="b" style="background:#2ad4e6"></span>solid #2AD4E6</span>
+        <span class="tok"><span class="b" style="background:rgba(42,212,230,0.14)"></span>fill 12%</span>
+        <span class="tok"><span class="b bd" style="box-shadow:inset 0 0 0 2px rgba(42,212,230,0.55)"></span>border 42%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chip" style="background:#3b9bff;color:#04121f"><span class="letter">Option B</span><span class="cname">Azure</span><span class="chex">#3B9BFF</span></div>
+    <div class="body">
+      <p class="desc"><b>A truer blue.</b> Slightly more “software dashboard” than cyan while staying sober and calm. Very legible on both grounds; the most conventional-modern option.</p>
+      <div class="tokens">
+        <span class="tok"><span class="b" style="background:#3b9bff"></span>solid #3B9BFF</span>
+        <span class="tok"><span class="b" style="background:rgba(59,155,255,0.16)"></span>fill 14%</span>
+        <span class="tok"><span class="b bd" style="box-shadow:inset 0 0 0 2px rgba(59,155,255,0.55)"></span>border 42%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chip" style="background:#a480ff;color:#140a24"><span class="letter">Option C</span><span class="cname">Violet</span><span class="chex">#A480FF</span></div>
+    <div class="body">
+      <p class="desc"><b>Distinctive and contemporary.</b> The most characterful option — it makes the product look considered rather than generic. Still calm enough for a control surface, with the most personality of the four.</p>
+      <div class="tokens">
+        <span class="tok"><span class="b" style="background:#a480ff"></span>solid #A480FF</span>
+        <span class="tok"><span class="b" style="background:rgba(164,128,255,0.16)"></span>fill 15%</span>
+        <span class="tok"><span class="b bd" style="box-shadow:inset 0 0 0 2px rgba(164,128,255,0.55)"></span>border 44%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chip" style="background:#7f9bbf;color:#0b1017"><span class="letter">Option D</span><span class="cname">Steel</span><span class="chex">#7F9BBF · muted</span></div>
+    <div class="body">
+      <p class="desc"><b>Quiet and utilitarian.</b> A desaturated blue-grey that recedes and lets the status colours do all the talking. The most restrained option — best if the priority is calm, no-nonsense monitoring over visual identity.</p>
+      <div class="tokens">
+        <span class="tok"><span class="b" style="background:#7f9bbf"></span>solid #7F9BBF</span>
+        <span class="tok"><span class="b" style="background:rgba(127,155,191,0.16)"></span>fill 16%</span>
+        <span class="tok"><span class="b bd" style="box-shadow:inset 0 0 0 2px rgba(127,155,191,0.55)"></span>border 46%</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<h2>The fixed status language</h2>
+<p>These four colours carry meaning and do <b>not</b> change with the accent. They are the same in every option and in both themes, so an operator reads state the same way regardless of the accent chosen.</p>
+<div class="swrow">
+  <div class="swatch"><div class="fill" style="background:#1f9d52"></div><div class="cap"><div class="nm">Healthy</div><div class="hx">#1F9D52</div><div class="use">Online, operating as commanded.</div></div></div>
+  <div class="swatch"><div class="fill" style="background:#c6810b"></div><div class="cap"><div class="nm">Warning</div><div class="hx">#C6810B</div><div class="use">Attention needed, still running.</div></div></div>
+  <div class="swatch"><div class="fill" style="background:#d83a34"></div><div class="cap"><div class="nm">Fault</div><div class="hx">#D83A34</div><div class="use">A failure requiring action.</div></div></div>
+  <div class="swatch"><div class="fill" style="background:#93a0ad"></div><div class="cap"><div class="nm">Offline</div><div class="hx">#93A0AD</div><div class="use">Not reporting / unknown.</div></div></div>
+</div>
+<p class="k">Note the deliberate distance between every accent option and the amber warning and red fault hues — that separation is what keeps interactive elements from being mistaken for alarms.</p>
+
+<h2>Neutrals &amp; themes</h2>
+<p>Each accent sits on one of two grounds. The neutrals are subtly cool rather than pure grey, and every screen is designed in both.</p>
+<div class="two">
+  <div class="theme-card">
+    <div class="band" style="background:#0d0f12;color:#e9edf1;border-bottom:1px solid #272c33">DARK — control room</div>
+    <div class="tc-body">
+      <div class="tt">Charcoal ground</div>
+      <div class="row"><span>Background</span><span>#0D0F12</span></div>
+      <div class="row"><span>Panel</span><span>#16191D</span></div>
+      <div class="row"><span>Hairline</span><span>#272C33</span></div>
+      <div class="row"><span>Text</span><span>#E9EDF1</span></div>
+    </div>
+  </div>
+  <div class="theme-card">
+    <div class="band" style="background:#eef1f5;color:#182029;border-bottom:1px solid #dce1e8">LIGHT — daylight</div>
+    <div class="tc-body">
+      <div class="tt">Cool paper ground</div>
+      <div class="row"><span>Background</span><span>#EEF1F5</span></div>
+      <div class="row"><span>Panel</span><span>#FFFFFF</span></div>
+      <div class="row"><span>Hairline</span><span>#DCE1E8</span></div>
+      <div class="row"><span>Text</span><span>#182029</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>Typography</h2>
+<ul>
+  <li><b>IBM Plex Sans</b> — all interface text, labels, and headings. An engineering-adjacent grotesque that suits an industrial control surface without feeling generic.</li>
+  <li><b>IBM Plex Mono</b> — every piece of machine data: node IDs, IP addresses, registers, counts, raw values, timestamps. The switch to mono is what makes data read as data.</li>
+</ul>
+
+<div class="callout">
+  <p class="ct">Choosing an option</p>
+  <p>Pick one letter — A, B, C or D. Only the accent tokens change; the status language, neutrals, layout, and typography stay exactly as they are, and the choice is applied across all five screens in both the dark and light themes.</p>
+</div>
+
+</body>
+</html>

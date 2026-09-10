@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --ink:#1b2027; --ink-soft:#39424d; --muted:#69737f; --faint:#9aa4b0;
+    --rule:#e4e8ee; --rule-soft:#eef1f5;
+    --accent:#0a8fa6; --accent-deep:#086b7d; --accent-soft:#e7f4f6;
+    --paper:#ffffff; --panel:#f7f9fb;
+    --ok:#1f9d52; --warn:#c6810b; --fault:#d83a34; --off:#93a0ad;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:var(--paper); }
+  body{ font-family:'IBM Plex Sans',system-ui,sans-serif; color:var(--ink);
+    font-size:15px; line-height:1.62; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .mono{ font-family:'IBM Plex Mono',ui-monospace,monospace; }
+
+  @page{ size:A4; margin:20mm 18mm 20mm; }
+  .docfoot{ position:fixed; left:0; right:0; bottom:9mm; padding:0 18mm;
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:8.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--faint); }
+
+  /* Title block */
+  .title-block{ border-top:3px solid var(--accent); padding-top:22px; margin-bottom:30px; }
+  .eyebrow{ font-family:'IBM Plex Mono'; font-size:11px; letter-spacing:0.24em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 14px; }
+  h1{ font-size:31px; font-weight:700; letter-spacing:-0.015em; line-height:1.12; margin:0 0 12px; text-wrap:balance; }
+  .subtitle{ font-size:15px; color:var(--muted); margin:0 0 20px; max-width:60ch; }
+  .meta{ display:flex; gap:26px; flex-wrap:wrap; padding-top:16px; border-top:1px solid var(--rule);
+    font-family:'IBM Plex Mono'; font-size:11px; color:var(--muted); }
+  .meta b{ color:var(--ink); font-weight:600; }
+
+  .lead{ font-size:15.5px; color:var(--ink-soft); margin:0 0 22px; }
+  .lead strong{ color:var(--ink); font-weight:600; }
+
+  /* Status legend */
+  .legend{ border:1px solid var(--rule); border-radius:10px; padding:16px 18px; margin:0 0 34px; background:var(--panel);
+    break-inside:avoid; }
+  .legend .lh{ font-family:'IBM Plex Mono'; font-size:10px; letter-spacing:0.16em; text-transform:uppercase;
+    color:var(--muted); margin:0 0 12px; }
+  .legend-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px 26px; }
+  .leg{ display:flex; align-items:baseline; gap:10px; font-size:13.5px; }
+  .leg .sw{ width:11px; height:11px; border-radius:3px; flex:0 0 auto; position:relative; top:1px; }
+  .leg b{ font-weight:600; }
+  .leg span{ color:var(--muted); }
+
+  /* Sections */
+  .section{ margin:0 0 30px; }
+  .sec-head{ display:flex; align-items:baseline; gap:14px; border-bottom:1px solid var(--rule);
+    padding-bottom:10px; margin-bottom:16px; break-after:avoid; }
+  .sec-no{ font-family:'IBM Plex Mono'; font-size:13px; font-weight:600; color:var(--accent); }
+  .sec-name{ font-size:20px; font-weight:700; letter-spacing:-0.01em; }
+  .sec-role{ font-size:12.5px; color:var(--muted); margin-left:auto; text-align:right; }
+
+  h3{ font-family:'IBM Plex Mono'; font-size:11px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--accent-deep); margin:18px 0 9px; break-after:avoid; }
+  p{ margin:0 0 12px; }
+  ul{ margin:0 0 12px; padding-left:0; list-style:none; }
+  li{ position:relative; padding-left:20px; margin-bottom:7px; }
+  li::before{ content:""; position:absolute; left:3px; top:9px; width:6px; height:6px; border-radius:2px;
+    background:var(--accent); }
+  li b{ font-weight:600; }
+  .k{ color:var(--muted); }
+
+  /* Callout */
+  .callout{ border:1px solid var(--rule); border-left:3px solid var(--accent); border-radius:8px;
+    background:var(--accent-soft); padding:14px 16px; margin:14px 0 4px; break-inside:avoid; }
+  .callout .ct{ font-family:'IBM Plex Mono'; font-size:10px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--accent-deep); margin:0 0 8px; }
+  .callout p{ margin:0 0 7px; font-size:13.5px; color:var(--ink-soft); }
+  .callout p:last-child{ margin-bottom:0; }
+
+  /* Tables */
+  table{ width:100%; border-collapse:collapse; margin:6px 0 14px; font-size:13px; break-inside:avoid; }
+  th,td{ text-align:left; padding:8px 12px; border-bottom:1px solid var(--rule); vertical-align:top; }
+  thead th{ background:var(--panel); font-size:10px; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--muted); font-weight:600; border-bottom:1px solid var(--rule); }
+  td.mono, th.mono{ font-family:'IBM Plex Mono'; }
+  .tag{ display:inline-block; font-family:'IBM Plex Mono'; font-size:11px; font-weight:600; padding:1px 7px;
+    border-radius:5px; }
+  .tag-op{ background:var(--accent-soft); color:var(--accent-deep); }
+  .tag-tech{ background:#f6ecd8; color:#8a5a06; }
+  .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:7px; position:relative; top:1px; }
+
+  .section, .title-block{ break-inside:auto; }
+</style>
+</head>
+<body>
+
+<div class="docfoot"><span>Metro Signage HMI · Interface Specification</span><span>Confidential · Engineering</span></div>
+
+<div class="title-block">
+  <p class="eyebrow">Interface Specification</p>
+  <h1>Metro Signage HMI — Screen Functions</h1>
+  <p class="subtitle">A page-by-page description of the operator touch panel: what each screen is for, what it shows, and the control rules it must obey.</p>
+  <div class="meta">
+    <span>Version <b>1.0</b></span>
+    <span>September <b>2026</b></span>
+    <span>Screens <b>5</b></span>
+    <span>Panel <b>1280 × 800</b></span>
+  </div>
+</div>
+
+<p class="lead">The HMI is a <strong>local touch panel</strong> that monitors and manually overrides up to <strong>100 ESP32 signage nodes</strong> across a station. It is a viewer and command surface only — the gateway daemon remains the master, so an HMI restart never interrupts the live network. Each node drives a signboard with a <strong>left moving arrow</strong>, a <strong>right moving arrow</strong>, and two always-on static zones. The screens below share one status language, applied consistently everywhere.</p>
+
+<div class="legend">
+  <p class="lh">Status colour language — used on every screen</p>
+  <div class="legend-grid">
+    <div class="leg"><span class="sw" style="background:var(--ok)"></span><div><b>Green — Healthy.</b> <span>Online and operating as commanded.</span></div></div>
+    <div class="leg"><span class="sw" style="background:var(--warn)"></span><div><b>Amber — Warning.</b> <span>Attention needed, still operating.</span></div></div>
+    <div class="leg"><span class="sw" style="background:var(--fault)"></span><div><b>Red — Fault.</b> <span>A failure that needs action.</span></div></div>
+    <div class="leg"><span class="sw" style="background:var(--off)"></span><div><b>Grey — Offline / unknown.</b> <span>Not reporting.</span></div></div>
+  </div>
+</div>
+
+<!-- 1 -->
+<div class="section">
+  <div class="sec-head"><span class="sec-no">01</span><span class="sec-name">Fleet Overview</span><span class="sec-role">Home screen · whole-network status at a glance</span></div>
+
+  <h3>Purpose</h3>
+  <p>The landing screen. It answers one question instantly — <b>is the fleet healthy, and if not, what needs attention?</b> — without the operator opening a single node.</p>
+
+  <h3>On screen</h3>
+  <ul>
+    <li><b>Status grid.</b> A 10 × 10 grid of tiles, one per node, each colour-coded by health. Green tiles mean everything is operating correctly; amber, red and grey flag the exceptions. A tile is tappable to open that node.</li>
+    <li><b>Headline counts.</b> A large “online out of 100” figure, with secondary counts of nodes that are healthy, in warning, in fault, and offline.</li>
+    <li><b>Alarms rail.</b> A running list, down the right, of conditions that need a person — newest first, with a count badge. Each entry shows the node, the cause, and a timestamp, and taps through to the node.</li>
+  </ul>
+
+  <div class="callout">
+    <p class="ct">What raises an alarm</p>
+    <p>The rail is built from real conditions the system already detects: a sensor reporting <span class="mono">FAIL_OPEN</span> or <span class="mono">FAIL_SHORT</span>; a node whose commanded mode and actual mode disagree; a sign left latched in a technician mode; and a node that has gone offline or cannot verify its outputs.</p>
+  </div>
+</div>
+
+<!-- 2 -->
+<div class="section">
+  <div class="sec-head"><span class="sec-no">02</span><span class="sec-name">Signage List</span><span class="sec-role">Searchable index · global control source</span></div>
+
+  <h3>Purpose</h3>
+  <p>The directory of all 100 nodes, for finding a specific sign and for switching the whole fleet between automatic and manual control.</p>
+
+  <h3>On screen</h3>
+  <ul>
+    <li><b>Node table.</b> Each row lists the node ID, IP address, assigned holding register, and a single roll-up health indicator. Rows are searchable by ID or IP and open the node when tapped.</li>
+    <li><b>Global control-source toggle.</b> A prominent switch between <b>REMOTE (SCADA / automatic)</b> and <b>LOCAL (HMI / manual)</b>. Its state is unmistakable, and it is deliberately hard to flip by accident.</li>
+  </ul>
+
+  <h3>Roll-up status</h3>
+  <table>
+    <thead><tr><th style="width:34%">Indicator</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><span class="dot" style="background:var(--ok)"></span><b>OK</b></td><td>Online, no faults, running its commanded mode.</td></tr>
+      <tr><td><span class="dot" style="background:var(--warn)"></span><b>Warning</b></td><td>Latched in a technician mode, or commanded ≠ actual.</td></tr>
+      <tr><td><span class="dot" style="background:var(--fault)"></span><b>Fault</b></td><td>A sensor failure, a hardware fault, or unreachable.</td></tr>
+      <tr><td><span class="dot" style="background:var(--off)"></span><b>Offline</b></td><td>Not reporting to the gateway.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <p class="ct">The control source is global</p>
+    <p>The toggle writes a single system register that governs <b>all 100 nodes at once</b> — it is not per-node. When set to REMOTE, the manual mode buttons on every Node Detail screen are locked; when set to LOCAL, they become live. This is the only control-source switch in the system; there is no physical local/remote switch anywhere.</p>
+  </div>
+</div>
+
+<!-- 3 -->
+<div class="section">
+  <div class="sec-head"><span class="sec-no">03</span><span class="sec-name">Node Detail</span><span class="sec-role">One node · telemetry and manual control</span></div>
+
+  <h3>Purpose</h3>
+  <p>Everything about a single sign, split into what it is <b>reporting</b> (read-only telemetry) and what the operator can <b>command</b> (arrow control). Opened by tapping a node anywhere else in the app.</p>
+
+  <h3>Telemetry</h3>
+  <p>Live rows for connection, main power, the two arrows, the two static zones, and a backup battery. The four arrow and zone rows use a four-state reading — and it is essential that an intended-off output is <b>not</b> shown as a fault:</p>
+  <table>
+    <thead><tr><th class="mono" style="width:26%">State</th><th style="width:20%">Colour</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">ON</td><td><span class="dot" style="background:var(--ok)"></span>Green</td><td>Intended on, current flowing — healthy.</td></tr>
+      <tr><td class="mono">OFF</td><td><span class="dot" style="background:var(--off)"></span>Neutral</td><td>Intended off, no current — <b>also healthy</b>.</td></tr>
+      <tr><td class="mono">FAIL_OPEN</td><td><span class="dot" style="background:var(--fault)"></span>Red</td><td>Intended on but drawing no current — broken LED, wire, or driver.</td></tr>
+      <tr><td class="mono">FAIL_SHORT</td><td><span class="dot" style="background:var(--fault)"></span>Red</td><td>Intended off but drawing current — a short or welded driver.</td></tr>
+    </tbody>
+  </table>
+  <p class="k">The backup battery is shown permanently greyed as “N/A · Not fitted”; the hardware slot exists but no battery is reported yet.</p>
+
+  <h3>Arrow triggering</h3>
+  <p>The core control. Commands drive the <b>moving arrows only</b> — the static zones are hardwired always-on and are never switchable. Two tiers of mode:</p>
+  <table>
+    <thead><tr><th class="mono" style="width:16%">Value</th><th style="width:26%">Mode</th><th>Access</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">0 / 1 / 2</td><td>Arrows off · LHS chase · RHS chase</td><td><span class="tag tag-op">Operator</span> everyday use</td></tr>
+      <tr><td class="mono">3</td><td>Both chase</td><td><span class="tag tag-tech">Technician</span> latches</td></tr>
+      <tr><td class="mono">4 / 5 / 6</td><td>Solid on — left · right · all</td><td><span class="tag tag-tech">Technician</span> latches</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Commanded vs actual</h3>
+  <p>The node reports what it is <b>actually executing</b>, shown beside what it was <b>commanded</b>. When the two agree the panel reads “in sync”; when they diverge it raises a prominent mismatch warning — the one case where a sign is showing something other than what the system believes.</p>
+
+  <div class="callout">
+    <p class="ct">Technician modes latch — by design</p>
+    <p>Modes 3–6 have no auto-revert: a sign left solid-on stays lit until someone changes it. The interface therefore styles them as a caution state and surfaces them in the fleet alarms, so a latched sign is never lost among 100 nodes. The mode buttons are live only when the global control source is LOCAL.</p>
+  </div>
+</div>
+
+<!-- 4 -->
+<div class="section">
+  <div class="sec-head"><span class="sec-no">04</span><span class="sec-name">Per-LED Control</span><span class="sec-role">Modal over Node Detail · low-level override</span></div>
+
+  <h3>Purpose</h3>
+  <p>A technician-level pop-up for driving the ten arrow LEDs individually, kept out of the everyday flow because it is not normal operation.</p>
+
+  <h3>On screen</h3>
+  <ul>
+    <li><b>Ten LEDs.</b> The left and right arrows as five lamps each. Tap a lamp to turn that LED on or off; lit lamps glow in the accent colour.</li>
+    <li><b>Quick actions.</b> “All LEDs on” and “All off” shortcuts.</li>
+    <li><b>Live raw value.</b> The resulting command value updates as lamps change, so the exact pattern being sent is always visible.</li>
+  </ul>
+
+  <div class="callout">
+    <p class="ct">Encoding &amp; safety</p>
+    <p>Per-LED patterns are sent as a raw value from <span class="mono">10000</span> (all off) to <span class="mono">11023</span> (all on) — a <span class="mono">10000</span> base plus a ten-bit mask. Because these outputs also latch, the pop-up carries a standing caution that the sign stays in whatever pattern is applied until a normal mode is re-commanded. In the current developer build the pop-up opens without a PIN; a technician PIN gate is planned.</p>
+  </div>
+</div>
+
+<!-- 5 -->
+<div class="section">
+  <div class="sec-head"><span class="sec-no">05</span><span class="sec-name">Diagnostics</span><span class="sec-role">System health · maintenance action</span></div>
+
+  <h3>Purpose</h3>
+  <p>The health of the gateway and the network behind the panel, plus a single maintenance action.</p>
+
+  <h3>On screen</h3>
+  <ul>
+    <li><b>Service health.</b> Live status of the MQTT broker, the Modbus TCP server, the gateway service, and the master gateway IP.</li>
+    <li><b>Network counts.</b> Large online / offline figures, with secondary warning and fault counts.</li>
+    <li><b>Broadcast ping.</b> One button that asks every node to re-publish its full telemetry.</li>
+  </ul>
+
+  <div class="callout">
+    <p class="ct">The ping is a refresh, not a fail-safe</p>
+    <p>Broadcast ping only requests fresh telemetry so the panel can rebuild state quickly. It does <b>not</b> reset any safety timer — none exists. On network loss, nodes hold their last command; pressing ping more often does not make the system safer, and it must never be described to an operator as a safety mechanism.</p>
+  </div>
+</div>
+
+</body>
+</html>

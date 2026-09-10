@@ -267,21 +267,30 @@
   .pingcard .pc{font-size:11.5px;color:var(--dim);margin:9px auto 18px;max-width:40ch;line-height:1.55;}
   .pingbtn{border:1px solid var(--accent-bd);background:var(--accent);color:var(--on-accent);border-radius:10px;padding:13px 32px;font-size:14px;font-weight:700;cursor:pointer;}
 
-/* ---- print layout ---- */
-@page { size: 1280px 800px; margin: 0; }
+.acc-cyan   { --accent:#2ad4e6; --accent-bg:rgba(42,212,230,0.12);  --accent-bd:rgba(42,212,230,0.42);  --on-accent:#04191d; }
+.acc-azure  { --accent:#3b9bff; --accent-bg:rgba(59,155,255,0.14);  --accent-bd:rgba(59,155,255,0.42);  --on-accent:#04121f; }
+.acc-violet { --accent:#a480ff; --accent-bg:rgba(164,128,255,0.15); --accent-bd:rgba(164,128,255,0.44); --on-accent:#140a24; }
+.acc-steel  { --accent:#7f9bbf; --accent-bg:rgba(127,155,191,0.16); --accent-bd:rgba(127,155,191,0.46); --on-accent:#0b1017; }
+@page { size: 1280px 840px; margin: 0; }
 html, body { margin: 0; padding: 0; background: #ffffff; }
 * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.page { width: 1280px; height: 800px; overflow: hidden; position: relative; break-after: page; }
-.page:last-child { break-after: auto; }
+.ppage { width: 1280px; height: 840px; overflow: hidden; display: flex; flex-direction: column; break-after: page; }
+.ppage:last-child { break-after: auto; }
+.pfoot { height: 40px; flex: 0 0 40px; display: flex; align-items: center; gap: 11px; padding: 0 24px;
+  background: #101317; border-top: 1px solid #272c33; color: #8a939d; font: 600 12px 'IBM Plex Sans', sans-serif; letter-spacing: 0.04em; }
+.pfoot .ky { font-family: 'IBM Plex Mono'; color: #606a74; }
+.pfoot .nm { font-weight: 700; font-size: 13px; }
+.pfoot .hx { font-family: 'IBM Plex Mono'; color: #606a74; letter-spacing: 0.06em; margin-left: auto; }
 </style></head><body>
 <div id="root"></div>
 <script>
 (function(){
-  var theme = (location.hash.replace("#","") || "dark");
-  var cls = theme === "light" ? "theme-light" : "theme-dark";
-  var apps = ["fleet","signage","node","popup","diag"];
-  document.getElementById("root").innerHTML = apps.map(function(a){
-    return '<div class="page"><div class="frame '+cls+'"><div class="app" data-app="'+a+'"></div></div></div>';
+  var opts = [["cyan","A","Cyan \u00b7 current","#2AD4E6"],["azure","B","Azure","#3B9BFF"],
+              ["violet","C","Violet","#A480FF"],["steel","D","Steel \u00b7 muted","#7F9BBF"]];
+  document.getElementById("root").innerHTML = opts.map(function(o){
+    return '<div class="ppage"><div class="frame theme-dark acc-'+o[0]+'"><div class="app" data-app="node"></div></div>'
+      + '<div class="pfoot"><span class="ky">'+o[1]+'</span><span class="nm" style="color:'+o[3]+'">'+o[2]+'</span><span class="hx">'+o[3]+'</span></div>'
+      + '</div>';
   }).join("");
 })();
 </script>
